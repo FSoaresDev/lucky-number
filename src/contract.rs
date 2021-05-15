@@ -1,26 +1,69 @@
-use cosmwasm_std::{
-    debug_print, to_binary, Api, Binary, Env, Extern, HandleResponse, InitResponse, Querier,
-    StdError, StdResult, Storage,
-};
+use cosmwasm_std::{Api, Binary, CosmosMsg, Env, Extern, HandleResponse, HumanAddr, InitResponse, Querier, QueryResult, StdError, StdResult, Storage, Uint128, WasmMsg, to_binary};
+use cosmwasm_storage::{PrefixedStorage, ReadonlyPrefixedStorage};
 
-use crate::msg::{CountResponse, HandleMsg, InitMsg, QueryMsg};
-use crate::state::{config, config_read, State};
+use crate::{msg::{CountResponse, HandleMsg, InitMsg, QueryAnswer, QueryMsg, Snip20Msg}, state::{load, save}};
+
+/*
+    5 min Lucky Number =>  1 sSCRT => 1 - 5
+    1h Lucky Number =>  5 sSCRT => 1 - 15
+    12h Lucky Number =>  10 sSCRT => 1-30
+*/
+pub const CONFIG_DATA: &[u8] = b"config";
+pub const ROUNDS_DATA: &[u8] = b"rounds";
+pub const HISTORY_BETS: &[u8] = b"historybets";
+pub const LUCKY_NUMBER_STATE_TIER_1: &[u8] = b"tier1";
+pub const LUCKY_NUMBER_STATE_TIER_2: &[u8] = b"tier2";
+pub const LUCKY_NUMBER_STATE_TIER_3: &[u8] = b"tier3";
+pub const BLOCK_SIZE: usize = 256;
 
 pub fn init<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
     env: Env,
     msg: InitMsg,
 ) -> StdResult<InitResponse> {
-    let state = State {
-        count: msg.count,
-        owner: deps.api.canonical_address(&env.message.sender)?,
-    };
+    let mut config_data = PrefixedStorage::new(CONFIG_DATA, &mut deps.storage);
+    save(&mut config_data, b"owner", &deps.api.canonical_address(&env.message.sender)?)?;
+    save(&mut config_data, b"triggerer", &deps.api.canonical_address(&msg.triggerer_address)?)?;
+    save(&mut config_data, b"token_address", &deps.api.canonical_address(&msg.token_address)?)?;
+    save(&mut config_data, b"token_hash", &msg.token_hash)?;
 
-    config(&mut deps.storage).save(&state)?;
+    let mut tier1_state = PrefixedStorage::new(LUCKY_NUMBER_STATE_TIER_1, &mut deps.storage);
+    save(&mut tier1_state, b"entry_fee", &msg.tier1_entry_fee)?;
+    save(&mut tier1_state, b"triggerer_fee", &msg.tier1_triggerer_fee)?;
+    save(&mut tier1_state, b"min_entries", &msg.tier1_min_entries)?;
+    save(&mut tier1_state, b"max_rand_number", &msg.tier1_max_rand_number)?;
+    save(&mut tier1_state, b"pool_size", &0)?;
+    save(&mut tier1_state, b"current_round", &0)?;
 
-    debug_print!("Contract was initialized by {}", env.message.sender);
+    let mut tier2_state = PrefixedStorage::new(LUCKY_NUMBER_STATE_TIER_2, &mut deps.storage);
+    save(&mut tier2_state, b"entry_fee", &msg.tier2_entry_fee)?;
+    save(&mut tier2_state, b"triggerer_fee", &msg.tier2_triggerer_fee)?;
+    save(&mut tier2_state, b"min_entries", &msg.tier2_min_entries)?;
+    save(&mut tier2_state, b"max_rand_number", &msg.tier2_max_rand_number)?;
+    save(&mut tier2_state, b"pool_size", &0)?;
+    save(&mut tier2_state, b"current_round", &0)?;
 
-    Ok(InitResponse::default())
+    let mut tier3_state = PrefixedStorage::new(LUCKY_NUMBER_STATE_TIER_3, &mut deps.storage);
+    save(&mut tier3_state, b"entry_fee", &msg.tier3_entry_fee)?;
+    save(&mut tier3_state, b"triggerer_fee", &msg.tier3_triggerer_fee)?;
+    save(&mut tier3_state, b"min_entries", &msg.tier3_min_entries)?;
+    save(&mut tier3_state, b"max_rand_number", &msg.tier3_max_rand_number)?;
+    save(&mut tier3_state, b"pool_size", &0)?;
+    save(&mut tier3_state, b"current_round", &0)?;
+
+    let snip20_register_msg = to_binary(&Snip20Msg::register_receive(env.clone().contract_code_hash))?;
+
+    let token_response: Option<CosmosMsg> = Some(CosmosMsg::Wasm(WasmMsg::Execute {
+        contract_addr: msg.token_address,
+        callback_code_hash: msg.token_hash,
+        msg: snip20_register_msg,
+        send: vec![],
+    }));
+
+    Ok(InitResponse {
+        messages: vec![token_response.unwrap()],
+        log: vec![],
+    })
 }
 
 pub fn handle<S: Storage, A: Api, Q: Querier>(
@@ -29,39 +72,27 @@ pub fn handle<S: Storage, A: Api, Q: Querier>(
     msg: HandleMsg,
 ) -> StdResult<HandleResponse> {
     match msg {
-        HandleMsg::Increment {} => try_increment(deps, env),
-        HandleMsg::Reset { count } => try_reset(deps, env, count),
+        HandleMsg::Receive { sender, from, amount, msg } => try_receive(deps, env, sender, from, amount, msg),
+        HandleMsg::ChangeTriggerer { triggerer } => try_change_triggerer(deps, env, triggerer)
     }
 }
 
-pub fn try_increment<S: Storage, A: Api, Q: Querier>(
+pub fn try_receive<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
-    _env: Env,
+    env: Env,
+    _sender: HumanAddr,
+    from: HumanAddr,
+    amount: Uint128,
+    msg: Option<Binary>,
 ) -> StdResult<HandleResponse> {
-    config(&mut deps.storage).update(|mut state| {
-        state.count += 1;
-        debug_print!("count = {}", state.count);
-        Ok(state)
-    })?;
-
-    debug_print("count incremented successfully");
     Ok(HandleResponse::default())
 }
 
-pub fn try_reset<S: Storage, A: Api, Q: Querier>(
+pub fn try_change_triggerer<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
     env: Env,
-    count: i32,
+    triggerer: HumanAddr,
 ) -> StdResult<HandleResponse> {
-    let sender_address_raw = deps.api.canonical_address(&env.message.sender)?;
-    config(&mut deps.storage).update(|mut state| {
-        if sender_address_raw != state.owner {
-            return Err(StdError::Unauthorized { backtrace: None });
-        }
-        state.count = count;
-        Ok(state)
-    })?;
-    debug_print("count reset successfully");
     Ok(HandleResponse::default())
 }
 
@@ -70,15 +101,20 @@ pub fn query<S: Storage, A: Api, Q: Querier>(
     msg: QueryMsg,
 ) -> StdResult<Binary> {
     match msg {
-        QueryMsg::GetCount {} => to_binary(&query_count(deps)?),
+        QueryMsg::GetTriggerer {} => to_binary(&query_triggerer(deps)?),
     }
 }
 
-fn query_count<S: Storage, A: Api, Q: Querier>(deps: &Extern<S, A, Q>) -> StdResult<CountResponse> {
-    let state = config_read(&deps.storage).load()?;
-    Ok(CountResponse { count: state.count })
+fn query_triggerer<S: Storage, A: Api, Q: Querier>(deps: &Extern<S, A, Q>) -> QueryResult  {
+    let config_data = ReadonlyPrefixedStorage::new(CONFIG_DATA, &deps.storage);
+    let triggerer_address: HumanAddr = load(&config_data, b"triggerer").unwrap();
+
+    to_binary(&QueryAnswer::GetTriggerer {
+        triggerer: triggerer_address
+    })
 }
 
+/* 
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -149,3 +185,4 @@ mod tests {
         assert_eq!(5, value.count);
     }
 }
+*/

@@ -19,7 +19,7 @@ unit-test:
 .PHONY: build _build
 build: _build compress-wasm
 _build:
-	RUSTFLAGS='-C link-arg=-s' cargo build --release --target wasm32-unknown-unknown --features="debug-print"
+	RUSTFLAGS='-C link-arg=-s' cargo build --release --target wasm32-unknown-unknown
 
 # This is a build suitable for uploading to mainnet.
 # Calls to `debug_print` get removed by the compiler.
@@ -61,6 +61,10 @@ start-server: # CTRL+C to stop
 .PHONY: store-contract-local
 store-contract-local:
 	docker exec secretdev secretcli tx compute store -y --from a --gas 1000000 /root/code/contract.wasm.gz
+
+.PHONY: list-code
+list-code:
+	docker exec secretdev secretcli query compute list-code
 
 .PHONY: clean
 clean:
