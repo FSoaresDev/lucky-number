@@ -45,7 +45,7 @@ build-store-contract:
 list-code:
 	docker exec secretdev secretcli query compute list-code
 
-#make instanciate-contract CODE=7 TRIGGERER=secret1ypfxpp4ev2sd9vj9ygmsmfxul25xt9cfadrxxy
+#make instanciate-contract CODE=10 TRIGGERER=secret1ypfxpp4ev2sd9vj9ygmsmfxul25xt9cfadrxxy
 .PHONY: instanciate-contract
 instanciate-contract:
 	docker exec secretdev bash -c "\
@@ -71,7 +71,7 @@ instanciate-contract:
 	--from a --gas 1500000 --label $(CODE) -b block -y \
 	"
 
-#make trigger CONTRACT=secret1y45vkh0n6kplaeqw6ratuertapxupz532vxnn3
+#make trigger CONTRACT=secret1uul3yzm2lgskp3dxpj0zg558hppxk6ptyljer5
 .PHONY: trigger
 trigger:
 	docker exec secretdev bash -c "\

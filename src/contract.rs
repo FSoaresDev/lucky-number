@@ -42,24 +42,24 @@ pub fn init<S: Storage, A: Api, Q: Querier>(
     save(&mut tier1_state, b"triggerer_fee", &msg.tier1_triggerer_fee)?;
     save(&mut tier1_state, b"min_entries", &msg.tier1_min_entries)?;
     save(&mut tier1_state, b"max_rand_number", &msg.tier1_max_rand_number)?;
-    save(&mut tier1_state, b"pool_size", &0)?;
-    save(&mut tier1_state, b"current_round", &0)?;
+    save(&mut tier1_state, b"pool_size", &Uint128(0))?;
+    save(&mut tier1_state, b"current_round", &Uint128(0))?;
 
     let mut tier2_state = PrefixedStorage::new(LUCKY_NUMBER_STATE_TIER_2, &mut deps.storage);
     save(&mut tier2_state, b"entry_fee", &msg.tier2_entry_fee)?;
     save(&mut tier2_state, b"triggerer_fee", &msg.tier2_triggerer_fee)?;
     save(&mut tier2_state, b"min_entries", &msg.tier2_min_entries)?;
     save(&mut tier2_state, b"max_rand_number", &msg.tier2_max_rand_number)?;
-    save(&mut tier2_state, b"pool_size", &0)?;
-    save(&mut tier2_state, b"current_round", &0)?;
+    save(&mut tier2_state, b"pool_size", &Uint128(0))?;
+    save(&mut tier2_state, b"current_round", &Uint128(0))?;
 
     let mut tier3_state = PrefixedStorage::new(LUCKY_NUMBER_STATE_TIER_3, &mut deps.storage);
     save(&mut tier3_state, b"entry_fee", &msg.tier3_entry_fee)?;
     save(&mut tier3_state, b"triggerer_fee", &msg.tier3_triggerer_fee)?;
     save(&mut tier3_state, b"min_entries", &msg.tier3_min_entries)?;
     save(&mut tier3_state, b"max_rand_number", &msg.tier3_max_rand_number)?;
-    save(&mut tier3_state, b"pool_size", &0)?;
-    save(&mut tier3_state, b"current_round", &0)?;
+    save(&mut tier3_state, b"pool_size", &Uint128(0))?;
+    save(&mut tier3_state, b"current_round", &Uint128(0))?;
 
     /*let snip20_register_msg = to_binary(&Snip20Msg::register_receive(env.clone().contract_code_hash))?;
 
@@ -145,6 +145,8 @@ pub fn try_trigger_lucky_number<S: Storage, A: Api, Q: Querier>(
     tier3: bool, 
     entropy: u64
 ) -> StdResult<HandleResponse> {
+    // check if it is the triggerer
+
     let config_data = ReadonlyPrefixedStorage::new(CONFIG_DATA, &deps.storage);
     // Generate seed vector: original entropy + this request entropy + max 6 entropy stored from users
     let base_entropy = load(&config_data, b"base_entropy").unwrap();
@@ -164,20 +166,41 @@ pub fn try_trigger_lucky_number<S: Storage, A: Api, Q: Querier>(
 
     if tier1 == true {
         let tier1 = ReadonlyPrefixedStorage::new(LUCKY_NUMBER_STATE_TIER_1, &deps.storage);
-        let max_rand_number_tier1: i16 = load(&tier1, b"max_rand_number").unwrap();
-        lucky_number_tier_1 = rng.gen_range(1,max_rand_number_tier1);
+        let pool_size_tier1: Uint128 = load(&tier1, b"pool_size").unwrap();
+        let min_entries_tier1: i16 = load(&tier1, b"min_entries").unwrap();
+        let entry_fee_tier1: Uint128 = load(&tier1, b"entry_fee").unwrap();
+
+        // check if there are enougth pool size (pool_size >= min_entries * entry_fee)
+        if pool_size_tier1 >= Uint128(min_entries_tier1 as u128).multiply_ratio(entry_fee_tier1, Uint128(1)) {
+            let max_rand_number_tier1: i16 = load(&tier1, b"max_rand_number").unwrap();
+            lucky_number_tier_1 = rng.gen_range(1,max_rand_number_tier1);
+        }
     }
 
     if tier2 == true {
         let tier2 = ReadonlyPrefixedStorage::new(LUCKY_NUMBER_STATE_TIER_2, &deps.storage);
-        let max_rand_number_tier2: i16 = load(&tier2, b"max_rand_number").unwrap();
-        lucky_number_tier_2 = rng.gen_range(1,max_rand_number_tier2);
+        let pool_size_tier2: Uint128 = load(&tier2, b"pool_size").unwrap();
+        let min_entries_tier2: i16 = load(&tier2, b"min_entries").unwrap();
+        let entry_fee_tier2: Uint128 = load(&tier2, b"entry_fee").unwrap();
+
+        // check if there are enougth pool size (pool_size >= min_entries * entry_fee)
+        if pool_size_tier2 >= Uint128(min_entries_tier2 as u128).multiply_ratio(entry_fee_tier2, Uint128(1)) {
+            let max_rand_number_tier2: i16 = load(&tier2, b"max_rand_number").unwrap();
+            lucky_number_tier_2 = rng.gen_range(1,max_rand_number_tier2);
+        }
     }
 
     if tier3 == true {
         let tier3 = ReadonlyPrefixedStorage::new(LUCKY_NUMBER_STATE_TIER_3, &deps.storage);
-        let max_rand_number_tier3: i16 = load(&tier3, b"max_rand_number").unwrap();
-        lucky_number_tier_3 = rng.gen_range(1,max_rand_number_tier3);
+        let pool_size_tier3: Uint128 = load(&tier3, b"pool_size").unwrap();
+        let min_entries_tier3: i16 = load(&tier3, b"min_entries").unwrap();
+        let entry_fee_tier3: Uint128 = load(&tier3, b"entry_fee").unwrap();
+
+        // check if there are enougth pool size (pool_size >= min_entries * entry_fee)
+        if pool_size_tier3 >= Uint128(min_entries_tier3 as u128).multiply_ratio(entry_fee_tier3, Uint128(1)) {
+            let max_rand_number_tier3: i16 = load(&tier3, b"max_rand_number").unwrap();
+            lucky_number_tier_3 = rng.gen_range(1,max_rand_number_tier3);
+        }
     }
 
     return Ok(HandleResponse {
