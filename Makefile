@@ -13,29 +13,6 @@ test: unit-test
 unit-test:
 	cargo test
 
-# This is a local build with debug-prints activated. Debug prints only show up
-# in the local development chain (see the `start-server` command below)
-# and mainnet won't accept contracts built with the feature enabled.
-.PHONY: build _build
-build: _build compress-wasm
-_build:
-	RUSTFLAGS='-C link-arg=-s' cargo build --release --target wasm32-unknown-unknown
-
-# This is a build suitable for uploading to mainnet.
-# Calls to `debug_print` get removed by the compiler.
-.PHONY: build-mainnet _build-mainnet
-build-mainnet: _build-mainnet compress-wasm
-_build-mainnet:
-	RUSTFLAGS='-C link-arg=-s' cargo build --release --target wasm32-unknown-unknown
-
-# like build-mainnet, but slower and more deterministic
-.PHONY: build-mainnet-reproducible
-build-mainnet-reproducible:
-	docker run --rm -v "$$(pwd)":/contract \
-		--mount type=volume,source="$$(basename "$$(pwd)")_cache",target=/contract/target \
-		--mount type=volume,source=registry_cache,target=/usr/local/cargo/registry \
-		enigmampc/secret-contract-optimizer:1.0.3
-
 .PHONY: compress-wasm
 compress-wasm:
 	cp ./target/wasm32-unknown-unknown/release/*.wasm ./contract.wasm
@@ -55,18 +32,59 @@ start-server: # CTRL+C to stop
 		-v $$(pwd):/root/code \
 		--name secretdev enigmampc/secret-network-sw-dev:v1.0.4-3
 
-# This relies on running `start-server` in another console
-# You can run other commands on the secretcli inside the dev image
-# by using `docker exec secretdev secretcli`.
-.PHONY: store-contract-local
-store-contract-local:
-	docker exec secretdev secretcli tx compute store -y --from a --gas 1000000 /root/code/contract.wasm.gz
+.PHONY: build-store-contract
+build-store-contract:
+	cargo clean
+	-rm -f ./contract.wasm ./contract.wasm.gz
+	RUSTFLAGS='-C link-arg=-s' cargo build --release --target wasm32-unknown-unknown
+	cp ./target/wasm32-unknown-unknown/release/*.wasm ./contract.wasm
+	cat ./contract.wasm | gzip -9 > ./contract.wasm.gz
+	docker exec secretdev secretcli tx compute store -y --from a --gas 10000000 /root/code/contract.wasm.gz
 
 .PHONY: list-code
 list-code:
 	docker exec secretdev secretcli query compute list-code
 
-.PHONY: clean
-clean:
-	cargo clean
-	-rm -f ./contract.wasm ./contract.wasm.gz
+#make instanciate-contract CODE=7 TRIGGERER=secret1ypfxpp4ev2sd9vj9ygmsmfxul25xt9cfadrxxy
+.PHONY: instanciate-contract
+instanciate-contract:
+	docker exec secretdev bash -c "\
+	secretcli tx compute instantiate $(CODE) \
+	'{\
+		\"entropy\": 123, \
+		\"triggerer_address\": \"$(TRIGGERER)\", \
+		\"token_address\": \"secret1ypfxpp4ev2sd9vj9ygmsmfxul25xt9cfadrxxy\", \
+		\"token_hash\": \"0xb66c6aca95004916baa13f8913ff1222c3e1775aaaf60f011cfaba7296d59d2c\", \
+		\"tier1_entry_fee\": \"10000000\", \
+		\"tier1_triggerer_fee\": \"5000000\", \
+		\"tier1_min_entries\": 30, \
+		\"tier1_max_rand_number\": 30, \
+		\"tier2_entry_fee\": \"5000000\", \
+		\"tier2_triggerer_fee\": \"2500000\", \
+		\"tier2_min_entries\": 15, \
+		\"tier2_max_rand_number\": 15, \
+		\"tier3_entry_fee\": \"1000000\", \
+		\"tier3_triggerer_fee\": \"500000\", \
+		\"tier3_min_entries\": 5, \
+		\"tier3_max_rand_number\": 5 \
+	}' \
+	--from a --gas 1500000 --label $(CODE) -b block -y \
+	"
+
+#make trigger CONTRACT=secret1y45vkh0n6kplaeqw6ratuertapxupz532vxnn3
+.PHONY: trigger
+trigger:
+	docker exec secretdev bash -c "\
+	secretcli tx compute execute $(CONTRACT) '{\"trigger_lucky_number\": {\"tier1\": true, \"tier2\": true, \"tier3\": true, \"entropy\": 52651}}' \
+	--from a --gas 1500000 -b block -y \
+	"
+
+#make get-triggerer CONTRACT=secret16t7y0vrtpqjw2d7jvc2209yan9002339gndv93
+.PHONY: get-triggerer
+get-triggerer:
+	docker exec secretdev bash -c "secretcli q compute query $(CONTRACT) '{\"get_triggerer\": {}}' | base64 --decode --ignore-garbage"
+
+#make hashes TX=99548FEB8D07C75E475814CA5A6FAD707893D80198E28A01FA1898C8D0FFCA4E
+.PHONY: hashes
+hashes:
+	docker exec secretdev secretcli query compute tx $(TX)

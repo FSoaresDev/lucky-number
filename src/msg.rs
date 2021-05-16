@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct InitMsg {
+    pub entropy: u64,
     pub triggerer_address: HumanAddr,
     pub token_address: HumanAddr,
     pub token_hash: String,
@@ -25,7 +26,10 @@ pub struct InitMsg {
 #[serde(rename_all = "snake_case")]
 pub enum HandleMsg {
     Receive { sender: HumanAddr, from: HumanAddr, amount: Uint128, msg: Option<Binary> },
-    ChangeTriggerer { triggerer: HumanAddr}
+    Withdrawl {tier: i8, round: i128 },
+    ChangeTriggerer { triggerer: HumanAddr},
+    ChangeTier { tier: i8, entry_fee: Uint128, triggerer_fee: Uint128, min_entries: i16, max_rand_number: i16 },
+    TriggerLuckyNumber {tier1: bool, tier2: bool, tier3: bool, entropy: u64}
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
