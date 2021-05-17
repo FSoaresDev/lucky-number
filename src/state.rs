@@ -38,12 +38,15 @@ pub struct RoundStruct {
     pub pool_size: Uint128,
     pub lucky_number: Option<i16>,
     pub users_count: u32,
+    pub round_end_timestamp: Option<u64>,
     pub users_picked_numbers_count: Vec<u32>
 }
   
-#[derive(Serialize, Clone, Debug, PartialEq)]
-pub struct UserBets {
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+pub struct UserBetStruct {
     pub round_number: u32,
-    pub user_picked_number: i16,
-    pub user_claimed_reward: bool
+    pub tier: i8,
+    pub number: i16,
+    pub claimed_reward: bool,
+    pub timestamp: u64
 }

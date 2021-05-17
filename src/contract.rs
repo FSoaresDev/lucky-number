@@ -1,13 +1,13 @@
 use std::collections::HashMap;
 
-use cosmwasm_std::{Api, Binary, CanonicalAddr, CosmosMsg, Env, Extern, HandleResponse, HumanAddr, InitResponse, LogAttribute, Querier, QueryResult, StdError, StdResult, Storage, Uint128, WasmMsg, to_binary};
+use cosmwasm_std::{Api, Binary, CanonicalAddr, CosmosMsg, Env, Extern, HandleResponse, HumanAddr, InitResponse, LogAttribute, Querier, QueryResult, StdError, StdResult, Storage, Uint128, WasmMsg, from_binary, to_binary};
 use cosmwasm_storage::{PrefixedStorage, ReadonlyPrefixedStorage};
 use rand::Rng;
 use rand_chacha::ChaChaRng;
 use secret_toolkit::storage::{AppendStore, AppendStoreMut, TypedStore};
 use sha2::{Digest, Sha256};
 use rand_core::SeedableRng;
-use crate::{msg::{CountResponse, HandleMsg, InitMsg, QueryAnswer, QueryMsg, Snip20Msg}, rand::sha_256, state::{RoundStruct, load, save}};
+use crate::{msg::{CountResponse, HandleMsg, InitMsg, QueryAnswer, QueryMsg, Snip20Msg}, rand::sha_256, state::{RoundStruct, UserBetStruct, load, save}};
 
 /*
     5 min Lucky Number =>  1 sSCRT => 1 - 5
@@ -18,9 +18,9 @@ pub const CONFIG_DATA: &[u8] = b"config";
 pub const LUCKY_NUMBER_CONFIG_TIER_1: &[u8] = b"tier1";
 pub const LUCKY_NUMBER_CONFIG_TIER_2: &[u8] = b"tier2";
 pub const LUCKY_NUMBER_CONFIG_TIER_3: &[u8] = b"tier3";
-pub const HISTORY_BETS: &[u8] = b"historybets";
-
 pub const ROUNDS_STATE: &[u8] = b"rounds";
+pub const BETS: &[u8] = b"bets";
+pub const MAPPING_BETS_TO_ROUNDS: &[u8] = b"mappings";
 pub const BLOCK_SIZE: usize = 256;
 
 pub fn init<S: Storage, A: Api, Q: Querier>(
@@ -35,6 +35,7 @@ pub fn init<S: Storage, A: Api, Q: Querier>(
         round_number: 0,
         lucky_number: None,
         users_count: 0,
+        round_end_timestamp: None,
         pool_size: Uint128(0),
         users_picked_numbers_count: vec![0; 0]
     };
@@ -78,7 +79,7 @@ pub fn init<S: Storage, A: Api, Q: Querier>(
     new_round.users_picked_numbers_count = vec![0; (&msg.tier3_max_rand_number + 1) as usize];
     tier3_rounds_store.push(&new_round)?;
 
-    /*let snip20_register_msg = to_binary(&Snip20Msg::register_receive(env.clone().contract_code_hash))?;
+    let snip20_register_msg = to_binary(&Snip20Msg::register_receive(env.clone().contract_code_hash))?;
 
     let token_response: Option<CosmosMsg> = Some(CosmosMsg::Wasm(WasmMsg::Execute {
         contract_addr: msg.token_address,
@@ -86,10 +87,10 @@ pub fn init<S: Storage, A: Api, Q: Querier>(
         msg: snip20_register_msg,
         send: vec![],
     }));
-*/
+
     Ok(InitResponse {
         messages: vec![
-           // token_response.unwrap()
+           token_response.unwrap()
         ],
         log: vec![],
     })
@@ -111,6 +112,8 @@ pub fn handle<S: Storage, A: Api, Q: Querier>(
         // Admin
         HandleMsg::ChangeTriggerer { triggerer } => try_change_triggerer(deps, env, triggerer),
         HandleMsg::ChangeTier { tier, entry_fee, triggerer_fee, min_entries, max_rand_number } => try_change_tier(deps, env, tier, entry_fee, triggerer_fee, min_entries, max_rand_number),
+
+        _ => Err(StdError::generic_err("Handler not found!"))
     }
 }
 
@@ -122,7 +125,100 @@ pub fn try_receive<S: Storage, A: Api, Q: Querier>(
     amount: Uint128,
     msg: Option<Binary>,
 ) -> StdResult<HandleResponse> {
-    Ok(HandleResponse::default())
+    if msg != None { 
+        let msg: HandleMsg = from_binary(&msg.unwrap())?; 
+        if matches!(msg, HandleMsg::Receive { .. }) {
+            return Err(StdError::generic_err(
+                "Recursive call to receive() is not allowed",
+            ));
+        }
+
+        if let HandleMsg::Bet {tier,number} = msg.clone() {
+            return try_bet(deps, env.clone(), amount, from, number, tier)
+        } else {
+            return Err(StdError::generic_err(format!(
+                "Receive handler not found!"
+            )));
+         }
+    } else {
+        return Err(StdError::generic_err(format!(
+            "Receive handler not found!"
+        )));
+    }
+}
+
+pub fn try_bet<S: Storage, A: Api, Q: Querier>(
+    deps: &mut Extern<S, A, Q>,
+    env: Env,
+    amount: Uint128,
+    from: HumanAddr,
+    number: i16,
+    tier: i8
+) -> StdResult<HandleResponse> {
+    let user_address = deps.api.canonical_address(&from)?;
+
+    // check if amount is correct for this tier
+    let tier_config_key = 
+        if tier == 1 { LUCKY_NUMBER_CONFIG_TIER_1 } 
+        else if tier == 2 { LUCKY_NUMBER_CONFIG_TIER_2 } 
+        else if tier == 3 { LUCKY_NUMBER_CONFIG_TIER_3 } 
+        else { 
+            return Err(StdError::generic_err(format!(
+                "Tier invalid"
+            )));
+        };
+
+    let tier_config = ReadonlyPrefixedStorage::new(tier_config_key, &deps.storage);
+    let entry_fee_tier: Uint128 = load(&tier_config, b"entry_fee").unwrap();
+    if entry_fee_tier != amount {
+        return Err(StdError::generic_err(format!(
+            "Amount invalid of tier choosen"
+        )));
+    }
+
+    let tier_rounds_key: String = "tier".to_owned()  + &tier.to_string();
+    let mut tier_rounds = PrefixedStorage::multilevel(&[ROUNDS_STATE, &tier_rounds_key.as_bytes()], &mut deps.storage);
+    let mut tier_rounds_store: AppendStoreMut<RoundStruct, _> = AppendStoreMut::attach_or_create(&mut tier_rounds)?;
+
+    let mut current_round_state = tier_rounds_store.get_at(tier_rounds_store.len() - 1).unwrap();
+
+    // update round state
+    current_round_state.pool_size = current_round_state.pool_size + amount;
+    current_round_state.users_count = current_round_state.users_count + 1;
+    current_round_state.users_picked_numbers_count[number as usize] = current_round_state.users_picked_numbers_count[number as usize] + 1;
+    tier_rounds_store.set_at(tier_rounds_store.len()-1,&current_round_state);
+
+    // how do i know if this user already bet on that tier/round: Mapping like SQL 
+     let mapping_key: String = "tier".to_owned() + &tier.to_string() + "_" + "round" + &current_round_state.round_number.to_string() + "_" + &user_address.to_string();
+     let mut mappings = PrefixedStorage::new(MAPPING_BETS_TO_ROUNDS, &mut deps.storage);
+     let map_result: Result<bool,StdError> = load(&mappings, mapping_key.as_bytes());
+ 
+    if !map_result.is_err() {
+        return Err(StdError::generic_err(format!(
+            "User already bet on this round / tier."
+        )));
+    }
+ 
+    save(&mut mappings, mapping_key.as_bytes(), &true)?;
+
+    //add user bet
+    let user_bet: UserBetStruct = UserBetStruct {
+        round_number: 0,
+        tier,
+        number,
+        claimed_reward: false,
+        timestamp: env.block.time
+    };
+
+    let mut bets_storage = PrefixedStorage::multilevel(&[BETS, &user_address.as_slice()], &mut deps.storage);
+    let mut bets_store = AppendStoreMut::attach_or_create(&mut bets_storage)?;
+    bets_store.push(&user_bet)?;
+
+    return Ok(HandleResponse {
+        messages: vec![],
+        log: vec![],
+        data: None,
+    })
 }
 
 pub fn try_change_triggerer<S: Storage, A: Api, Q: Querier>(
@@ -200,6 +296,7 @@ pub fn try_trigger_lucky_number<S: Storage, A: Api, Q: Querier>(
             //update round
             let mut updated_round = tier1_cur_round;
             updated_round.lucky_number = Some(lucky_number_tier_1);
+            updated_round.round_end_timestamp = Some(env.block.time);
             tier1_rounds_store.set_at(tier1_rounds_store.len()-1,&updated_round);
 
             //new round
@@ -207,6 +304,7 @@ pub fn try_trigger_lucky_number<S: Storage, A: Api, Q: Querier>(
                 round_number: tier1_rounds_store.len(),
                 lucky_number: None,
                 users_count: 0,
+                round_end_timestamp: None,
                 pool_size: Uint128(0),
                 users_picked_numbers_count: vec![0; (max_rand_number_tier1 + 1) as usize]
             };
@@ -233,6 +331,7 @@ pub fn try_trigger_lucky_number<S: Storage, A: Api, Q: Querier>(
             //update round
             let mut updated_round = tier2_cur_round;
             updated_round.lucky_number = Some(lucky_number_tier_2);
+            updated_round.round_end_timestamp = Some(env.block.time);
             tier2_rounds_store.set_at(tier2_rounds_store.len()-1,&updated_round);
 
             //new round
@@ -240,6 +339,7 @@ pub fn try_trigger_lucky_number<S: Storage, A: Api, Q: Querier>(
                 round_number: tier2_rounds_store.len(),
                 lucky_number: None,
                 users_count: 0,
+                round_end_timestamp: None,
                 pool_size: Uint128(0),
                 users_picked_numbers_count: vec![0; (max_rand_number_tier2 + 1) as usize]
             };
@@ -266,6 +366,7 @@ pub fn try_trigger_lucky_number<S: Storage, A: Api, Q: Querier>(
             //update round
             let mut updated_round = tier3_cur_round;
             updated_round.lucky_number = Some(lucky_number_tier_3);
+            updated_round.round_end_timestamp = Some(env.block.time);
             tier3_rounds_store.set_at(tier3_rounds_store.len()-1,&updated_round);
 
             //new round
@@ -273,6 +374,7 @@ pub fn try_trigger_lucky_number<S: Storage, A: Api, Q: Querier>(
                 round_number: tier3_rounds_store.len(),
                 lucky_number: None,
                 users_count: 0,
+                round_end_timestamp: None,
                 pool_size: Uint128(0),
                 users_picked_numbers_count: vec![0; (max_rand_number_tier3 + 1) as usize]
             };
