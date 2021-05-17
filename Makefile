@@ -45,7 +45,7 @@ build-store-contract:
 list-code:
 	docker exec secretdev secretcli query compute list-code
 
-#make instanciate-contract CODE=10 TRIGGERER=secret1ypfxpp4ev2sd9vj9ygmsmfxul25xt9cfadrxxy
+#make instanciate-contract CODE=31 TRIGGERER=secret1ypfxpp4ev2sd9vj9ygmsmfxul25xt9cfadrxxy
 .PHONY: instanciate-contract
 instanciate-contract:
 	docker exec secretdev bash -c "\
@@ -71,7 +71,7 @@ instanciate-contract:
 	--from a --gas 1500000 --label $(CODE) -b block -y \
 	"
 
-#make trigger CONTRACT=secret1uul3yzm2lgskp3dxpj0zg558hppxk6ptyljer5
+#make trigger CONTRACT=secret1hzdlry39ydm0wqflglslcu26v6dnxzk0dnttf9
 .PHONY: trigger
 trigger:
 	docker exec secretdev bash -c "\
@@ -83,6 +83,11 @@ trigger:
 .PHONY: get-triggerer
 get-triggerer:
 	docker exec secretdev bash -c "secretcli q compute query $(CONTRACT) '{\"get_triggerer\": {}}' | base64 --decode --ignore-garbage"
+
+#make get-rounds CONTRACT=secret1grmyj2j670w6e9psjwue8r3f3ezk37ashmcy8f
+.PHONY: get-rounds
+get-rounds:
+	docker exec secretdev bash -c "secretcli q compute query $(CONTRACT) '{\"get_rounds\": {\"tier1\": true, \"tier2\": true, \"tier3\": true, \"page_size\": 10, \"page\": 0 }}'| base64 --decode --ignore-garbage"
 
 #make hashes TX=99548FEB8D07C75E475814CA5A6FAD707893D80198E28A01FA1898C8D0FFCA4E
 .PHONY: hashes

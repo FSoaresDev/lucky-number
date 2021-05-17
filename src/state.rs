@@ -1,9 +1,9 @@
-use std::any::type_name;
-
+use std::{any::type_name, collections::HashMap};
+use schemars::JsonSchema;
 use secret_toolkit::serialization::{Bincode2, Serde};
-use serde::{de::DeserializeOwned, Serialize};
+use serde::{de::DeserializeOwned, Serialize, Deserialize};
 
-use cosmwasm_std::{ReadonlyStorage, StdError, StdResult, Storage};
+use cosmwasm_std::{CanonicalAddr, ReadonlyStorage, StdError, StdResult, Storage, Uint128};
 
 pub fn save<T: Serialize, S: Storage>(storage: &mut S, key: &[u8], value: &T) -> StdResult<()> {
     storage.set(key, &Bincode2::serialize(value)?);
@@ -30,4 +30,20 @@ pub fn may_load<T: DeserializeOwned, S: ReadonlyStorage>(
 
 pub fn remove<S: Storage>(storage: &mut S, key: &[u8]) {
     storage.remove(key);
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+pub struct RoundStruct {
+    pub round_number: u32,
+    pub pool_size: Uint128,
+    pub lucky_number: Option<i16>,
+    pub users_count: u32,
+    pub users_picked_numbers_count: Vec<u32>
+}
+  
+#[derive(Serialize, Clone, Debug, PartialEq)]
+pub struct UserBets {
+    pub round_number: u32,
+    pub user_picked_number: i16,
+    pub user_claimed_reward: bool
 }

@@ -2,6 +2,8 @@ use cosmwasm_std::{Binary, HumanAddr, Uint128};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
+use crate::state::RoundStruct;
+
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct InitMsg {
     pub entropy: u64,
@@ -37,6 +39,7 @@ pub enum HandleMsg {
 pub enum QueryMsg {
     // GetCount returns the current count as a json-encoded number
     GetTriggerer {},
+    GetRounds { tier1: bool, tier2: bool, tier3: bool, page: u32, page_size: u32}
 }
 
 // We define a custom struct for each query response
@@ -81,4 +84,9 @@ pub enum QueryAnswer {
     GetTriggerer {
         triggerer: HumanAddr
     },
+    GetRounds { 
+        tier1_rounds: Option<Vec<RoundStruct>>,
+        tier2_rounds: Option<Vec<RoundStruct>>,
+        tier3_rounds: Option<Vec<RoundStruct>>
+    }
 }
