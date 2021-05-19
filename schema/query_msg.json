@@ -5,11 +5,50 @@
     {
       "type": "object",
       "required": [
-        "get_count"
+        "get_triggerer"
       ],
       "properties": {
-        "get_count": {
+        "get_triggerer": {
           "type": "object"
+        }
+      }
+    },
+    {
+      "type": "object",
+      "required": [
+        "get_rounds"
+      ],
+      "properties": {
+        "get_rounds": {
+          "type": "object",
+          "required": [
+            "page",
+            "page_size",
+            "tier1",
+            "tier2",
+            "tier3"
+          ],
+          "properties": {
+            "page": {
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0.0
+            },
+            "page_size": {
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0.0
+            },
+            "tier1": {
+              "type": "boolean"
+            },
+            "tier2": {
+              "type": "boolean"
+            },
+            "tier3": {
+              "type": "boolean"
+            }
+          }
         }
       }
     }

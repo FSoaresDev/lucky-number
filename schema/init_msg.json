@@ -3,12 +3,87 @@
   "title": "InitMsg",
   "type": "object",
   "required": [
-    "count"
+    "entropy",
+    "tier1_entry_fee",
+    "tier1_max_rand_number",
+    "tier1_min_entries",
+    "tier1_triggerer_fee",
+    "tier2_entry_fee",
+    "tier2_max_rand_number",
+    "tier2_min_entries",
+    "tier2_triggerer_fee",
+    "tier3_entry_fee",
+    "tier3_max_rand_number",
+    "tier3_min_entries",
+    "tier3_triggerer_fee",
+    "token_address",
+    "token_hash",
+    "triggerer_address"
   ],
   "properties": {
-    "count": {
+    "entropy": {
       "type": "integer",
-      "format": "int32"
+      "format": "uint64",
+      "minimum": 0.0
+    },
+    "tier1_entry_fee": {
+      "$ref": "#/definitions/Uint128"
+    },
+    "tier1_max_rand_number": {
+      "type": "integer",
+      "format": "int16"
+    },
+    "tier1_min_entries": {
+      "type": "integer",
+      "format": "int16"
+    },
+    "tier1_triggerer_fee": {
+      "$ref": "#/definitions/Uint128"
+    },
+    "tier2_entry_fee": {
+      "$ref": "#/definitions/Uint128"
+    },
+    "tier2_max_rand_number": {
+      "type": "integer",
+      "format": "int16"
+    },
+    "tier2_min_entries": {
+      "type": "integer",
+      "format": "int16"
+    },
+    "tier2_triggerer_fee": {
+      "$ref": "#/definitions/Uint128"
+    },
+    "tier3_entry_fee": {
+      "$ref": "#/definitions/Uint128"
+    },
+    "tier3_max_rand_number": {
+      "type": "integer",
+      "format": "int16"
+    },
+    "tier3_min_entries": {
+      "type": "integer",
+      "format": "int16"
+    },
+    "tier3_triggerer_fee": {
+      "$ref": "#/definitions/Uint128"
+    },
+    "token_address": {
+      "$ref": "#/definitions/HumanAddr"
+    },
+    "token_hash": {
+      "type": "string"
+    },
+    "triggerer_address": {
+      "$ref": "#/definitions/HumanAddr"
+    }
+  },
+  "definitions": {
+    "HumanAddr": {
+      "type": "string"
+    },
+    "Uint128": {
+      "type": "string"
     }
   }
 }

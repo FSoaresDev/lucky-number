@@ -45,7 +45,7 @@ build-store-contract:
 list-code:
 	docker exec secretdev secretcli query compute list-code
 
-#make instanciate-contract CODE=31 TRIGGERER=secret1ypfxpp4ev2sd9vj9ygmsmfxul25xt9cfadrxxy
+#make instanciate-contract CODE=1 TRIGGERER=secret1ypfxpp4ev2sd9vj9ygmsmfxul25xt9cfadrxxy
 .PHONY: instanciate-contract
 instanciate-contract:
 	docker exec secretdev bash -c "\
@@ -93,3 +93,8 @@ get-rounds:
 .PHONY: hashes
 hashes:
 	docker exec secretdev secretcli query compute tx $(TX)
+	
+	
+.PHONY: deploy
+deploy:
+	bash deploy/testnet.sh

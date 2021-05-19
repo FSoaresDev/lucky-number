@@ -79,7 +79,7 @@ pub fn init<S: Storage, A: Api, Q: Querier>(
     new_round.users_picked_numbers_count = vec![0; (&msg.tier3_max_rand_number + 1) as usize];
     tier3_rounds_store.push(&new_round)?;
 
-    let snip20_register_msg = to_binary(&Snip20Msg::register_receive(env.clone().contract_code_hash))?;
+   let snip20_register_msg = to_binary(&Snip20Msg::register_receive(env.clone().contract_code_hash))?;
 
     let token_response: Option<CosmosMsg> = Some(CosmosMsg::Wasm(WasmMsg::Execute {
         contract_addr: msg.token_address,
