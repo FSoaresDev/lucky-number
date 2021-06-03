@@ -16,6 +16,17 @@
     {
       "type": "object",
       "required": [
+        "get_entropy"
+      ],
+      "properties": {
+        "get_entropy": {
+          "type": "object"
+        }
+      }
+    },
+    {
+      "type": "object",
+      "required": [
         "get_rounds"
       ],
       "properties": {

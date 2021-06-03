@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, path::Prefix};
 
 use cosmwasm_std::{Api, Binary, CanonicalAddr, CosmosMsg, Env, Extern, HandleResponse, HumanAddr, InitResponse, LogAttribute, Querier, QueryResult, StdError, StdResult, Storage, Uint128, WasmMsg, from_binary, to_binary};
 use cosmwasm_storage::{PrefixedStorage, ReadonlyPrefixedStorage};
@@ -56,7 +56,7 @@ pub fn init<S: Storage, A: Api, Q: Querier>(
     save(&mut tier1_state, b"max_rand_number", &msg.tier1_max_rand_number)?;
     let mut tier1_rounds = PrefixedStorage::multilevel(&[ROUNDS_STATE, &"tier1".to_string().as_bytes()], &mut deps.storage);
     let mut tier1_rounds_store: AppendStoreMut<RoundStruct, _> = AppendStoreMut::attach_or_create(&mut tier1_rounds)?;
-    new_round.users_picked_numbers_count = vec![0; (&msg.tier1_max_rand_number + 1) as usize];
+    new_round.users_picked_numbers_count = vec![0; *(&msg.tier1_max_rand_number) as usize];
     tier1_rounds_store.push(&new_round)?;
 
     let mut tier2_state = PrefixedStorage::new(LUCKY_NUMBER_CONFIG_TIER_2, &mut deps.storage);
@@ -66,7 +66,7 @@ pub fn init<S: Storage, A: Api, Q: Querier>(
     save(&mut tier2_state, b"max_rand_number", &msg.tier2_max_rand_number)?;
     let mut tier2_rounds = PrefixedStorage::multilevel(&[ROUNDS_STATE, &"tier2".to_string().as_bytes()], &mut deps.storage);
     let mut tier2_rounds_store: AppendStoreMut<RoundStruct, _> = AppendStoreMut::attach_or_create(&mut tier2_rounds)?;
-    new_round.users_picked_numbers_count = vec![0; (&msg.tier2_max_rand_number + 1) as usize];
+    new_round.users_picked_numbers_count = vec![0; *(&msg.tier2_max_rand_number) as usize];
     tier2_rounds_store.push(&new_round)?;
 
     let mut tier3_state = PrefixedStorage::new(LUCKY_NUMBER_CONFIG_TIER_3, &mut deps.storage);
@@ -76,7 +76,7 @@ pub fn init<S: Storage, A: Api, Q: Querier>(
     save(&mut tier3_state, b"max_rand_number", &msg.tier3_max_rand_number)?;
     let mut tier3_rounds = PrefixedStorage::multilevel(&[ROUNDS_STATE, &"tier3".to_string().as_bytes()], &mut deps.storage);
     let mut tier3_rounds_store: AppendStoreMut<RoundStruct, _> = AppendStoreMut::attach_or_create(&mut tier3_rounds)?;
-    new_round.users_picked_numbers_count = vec![0; (&msg.tier3_max_rand_number + 1) as usize];
+    new_round.users_picked_numbers_count = vec![0; *(&msg.tier3_max_rand_number) as usize];
     tier3_rounds_store.push(&new_round)?;
 
    let snip20_register_msg = to_binary(&Snip20Msg::register_receive(env.clone().contract_code_hash))?;
@@ -185,7 +185,7 @@ pub fn try_bet<S: Storage, A: Api, Q: Querier>(
     // update round state
     current_round_state.pool_size = current_round_state.pool_size + amount;
     current_round_state.users_count = current_round_state.users_count + 1;
-    current_round_state.users_picked_numbers_count[number as usize] = current_round_state.users_picked_numbers_count[number as usize] + 1;
+    current_round_state.users_picked_numbers_count[number as usize - 1] = current_round_state.users_picked_numbers_count[number as usize - 1] + 1;
     tier_rounds_store.set_at(tier_rounds_store.len()-1,&current_round_state);
 
     // how do i know if this user already bet on that tier/round: Mapping like SQL 
@@ -213,6 +213,18 @@ pub fn try_bet<S: Storage, A: Api, Q: Querier>(
     let mut bets_storage = PrefixedStorage::multilevel(&[BETS, &user_address.as_slice()], &mut deps.storage);
     let mut bets_store = AppendStoreMut::attach_or_create(&mut bets_storage)?;
     bets_store.push(&user_bet)?;
+
+    // add the bet number to the additional entropy array
+    // As on ChaChaRng only up to 8 words are used, and 2 of them are the base entropy and the entropy sent by the trigger we will save only 6 users entropy on this array
+    let mut config_data = PrefixedStorage::new(CONFIG_DATA, &mut deps.storage);
+    let mut addition_entropy: Vec<_> = load(&config_data, b"addition_entropy").unwrap();
+    if addition_entropy.len() >= 6 {
+        addition_entropy[0] = number as u64;
+        addition_entropy.rotate_right(1);
+    } else {
+        addition_entropy.push(number as u64)
+    }
+    save(&mut config_data, b"addition_entropy", &addition_entropy)?;
 
     return Ok(HandleResponse {
         messages: vec![],
@@ -258,7 +270,7 @@ pub fn try_trigger_lucky_number<S: Storage, A: Api, Q: Querier>(
     tier3: bool, 
     entropy: u64
 ) -> StdResult<HandleResponse> {
-    // check if it is the triggerer
+    // TODO: check if it is the triggerer
     
     let config_data = ReadonlyPrefixedStorage::new(CONFIG_DATA, &deps.storage);
     // Generate seed vector: original entropy + this request entropy + max 6 entropy stored from users
@@ -267,11 +279,11 @@ pub fn try_trigger_lucky_number<S: Storage, A: Api, Q: Querier>(
 
     addition_entropy.push(base_entropy);
     addition_entropy.push(entropy.clone().to_be_bytes());
-
+    
     let mut hasher = Sha256::new();
     addition_entropy.iter().for_each(|el| hasher.update(el));
     let seed:[u8; 32] = hasher.finalize().into();
-    let mut rng = ChaChaRng::from_seed(seed);
+    let mut rng = ChaChaRng::from_seed(seed); // ChaChaRng::from_seed Only up to 8 words are used;
 
     let mut lucky_number_tier_1: i16 = 0;
     let mut lucky_number_tier_2: i16 = 0;
@@ -306,7 +318,7 @@ pub fn try_trigger_lucky_number<S: Storage, A: Api, Q: Querier>(
                 users_count: 0,
                 round_end_timestamp: None,
                 pool_size: Uint128(0),
-                users_picked_numbers_count: vec![0; (max_rand_number_tier1 + 1) as usize]
+                users_picked_numbers_count: vec![0; (max_rand_number_tier1) as usize]
             };
             tier1_rounds_store.push(&new_round)?;
         }
@@ -341,7 +353,7 @@ pub fn try_trigger_lucky_number<S: Storage, A: Api, Q: Querier>(
                 users_count: 0,
                 round_end_timestamp: None,
                 pool_size: Uint128(0),
-                users_picked_numbers_count: vec![0; (max_rand_number_tier2 + 1) as usize]
+                users_picked_numbers_count: vec![0; (max_rand_number_tier2) as usize]
             };
             tier2_rounds_store.push(&new_round)?;
         }
@@ -376,7 +388,7 @@ pub fn try_trigger_lucky_number<S: Storage, A: Api, Q: Querier>(
                 users_count: 0,
                 round_end_timestamp: None,
                 pool_size: Uint128(0),
-                users_picked_numbers_count: vec![0; (max_rand_number_tier3 + 1) as usize]
+                users_picked_numbers_count: vec![0; (max_rand_number_tier3) as usize]
             };
             tier3_rounds_store.push(&new_round)?;
         }
@@ -391,7 +403,7 @@ pub fn try_trigger_lucky_number<S: Storage, A: Api, Q: Querier>(
         ],
         data: None,
     });
-}
+} 
 
 pub fn query<S: Storage, A: Api, Q: Querier>(
     deps: &Extern<S, A, Q>,
