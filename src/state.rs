@@ -42,11 +42,17 @@ pub struct RoundStruct {
     pub users_picked_numbers_count: Vec<u32>
 }
   
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct UserBetStruct {
     pub round_number: u32,
     pub tier: i8,
     pub number: i16,
     pub claimed_reward: bool,
     pub timestamp: u64
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+pub struct UserBetsStruct {
+    pub bet_keys: Vec<String>,
+    pub bets: HashMap<String,UserBetStruct>,
 }

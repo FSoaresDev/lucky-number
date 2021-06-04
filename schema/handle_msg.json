@@ -79,7 +79,8 @@
           "properties": {
             "round": {
               "type": "integer",
-              "format": "int128"
+              "format": "uint32",
+              "minimum": 0.0
             },
             "tier": {
               "type": "integer",

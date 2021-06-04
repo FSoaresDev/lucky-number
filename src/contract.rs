@@ -1,4 +1,4 @@
-use std::{collections::HashMap, path::Prefix};
+use std::{collections::HashMap, hash::Hash, path::Prefix};
 
 use cosmwasm_std::{Api, Binary, CanonicalAddr, CosmosMsg, Env, Extern, HandleResponse, HumanAddr, InitResponse, LogAttribute, Querier, QueryResult, StdError, StdResult, Storage, Uint128, WasmMsg, from_binary, to_binary};
 use cosmwasm_storage::{PrefixedStorage, ReadonlyPrefixedStorage};
@@ -7,7 +7,7 @@ use rand_chacha::ChaChaRng;
 use secret_toolkit::storage::{AppendStore, AppendStoreMut, TypedStore};
 use sha2::{Digest, Sha256};
 use rand_core::SeedableRng;
-use crate::{msg::{CountResponse, HandleMsg, InitMsg, QueryAnswer, QueryMsg, Snip20Msg}, rand::sha_256, state::{RoundStruct, UserBetStruct, load, save}};
+use crate::{msg::{CountResponse, HandleMsg, InitMsg, QueryAnswer, QueryMsg, Snip20Msg}, rand::sha_256, state::{RoundStruct, UserBetStruct, UserBetsStruct, load, may_load, save}};
 
 /*
     5 min Lucky Number =>  1 sSCRT => 1 - 5
@@ -20,7 +20,6 @@ pub const LUCKY_NUMBER_CONFIG_TIER_2: &[u8] = b"tier2";
 pub const LUCKY_NUMBER_CONFIG_TIER_3: &[u8] = b"tier3";
 pub const ROUNDS_STATE: &[u8] = b"rounds";
 pub const BETS: &[u8] = b"bets";
-pub const MAPPING_BETS_TO_ROUNDS: &[u8] = b"mappings";
 pub const BLOCK_SIZE: usize = 256;
 
 pub fn init<S: Storage, A: Api, Q: Querier>(
@@ -188,20 +187,32 @@ pub fn try_bet<S: Storage, A: Api, Q: Querier>(
     current_round_state.users_picked_numbers_count[number as usize - 1] = current_round_state.users_picked_numbers_count[number as usize - 1] + 1;
     tier_rounds_store.set_at(tier_rounds_store.len()-1,&current_round_state);
 
-    // how do i know if this user already bet on that tier/round: Mapping like SQL 
-     let mapping_key: String = "tier".to_owned() + &tier.to_string() + "_" + "round" + &current_round_state.round_number.to_string() + "_" + &user_address.to_string();
-     let mut mappings = PrefixedStorage::new(MAPPING_BETS_TO_ROUNDS, &mut deps.storage);
-     let map_result: Result<bool,StdError> = load(&mappings, mapping_key.as_bytes());
+    // how do i know if this user already bet on that tier/round 
+    let mapping_key: String = "tier".to_owned() + &tier.to_string() + "_" + "round" + &current_round_state.round_number.to_string();
+    let mut bets_storage = PrefixedStorage::new(BETS, &mut deps.storage);
+    let mut user_bets: Option<UserBetsStruct> = may_load(&bets_storage, &user_address.as_slice())?;
+
+    if user_bets.clone() != None && user_bets.clone().unwrap().bets.contains_key(&mapping_key) {
+        return Err(StdError::generic_err(format!(
+            "User already bet on this round / tier."
+        )));
+    }
+
+    /*let mapping_key: String = "tier".to_owned() + &tier.to_string() + "_" + "round" + &current_round_state.round_number.to_string() + "_" + &user_address.to_string();
+    let mut mappings = PrefixedStorage::new(MAPPING_BETS_TO_ROUNDS, &mut deps.storage);
+    let map_result: Result<bool,StdError> = load(&mappings, mapping_key.as_bytes());
  
-    if !map_result.is_err() {
+    if !map_result.is_err() && map_result.unwrap() == true {
         return Err(StdError::generic_err(format!(
             "User already bet on this round / tier."
         )));
     }
  
     save(&mut mappings, mapping_key.as_bytes(), &true)?;
+*/
 
     //add user bet
+    
     let user_bet: UserBetStruct = UserBetStruct {
         round_number: 0,
         tier,
@@ -210,9 +221,25 @@ pub fn try_bet<S: Storage, A: Api, Q: Querier>(
         timestamp: env.block.time
     };
 
-    let mut bets_storage = PrefixedStorage::multilevel(&[BETS, &user_address.as_slice()], &mut deps.storage);
-    let mut bets_store = AppendStoreMut::attach_or_create(&mut bets_storage)?;
-    bets_store.push(&user_bet)?;
+    // { <user_address>: { "bet_keys": [...], "bets": {...} } }
+    if user_bets.clone() == None {
+        let mut hashmap: HashMap<String, UserBetStruct> = HashMap::new();
+        hashmap.insert(mapping_key.clone(), user_bet);
+
+        user_bets = Some(UserBetsStruct {
+            bet_keys: vec![ mapping_key.clone() ],
+            bets: hashmap
+        })
+    } else {
+        user_bets.clone().unwrap().bet_keys.push(mapping_key.clone());
+        user_bets.clone().unwrap().bets.insert(mapping_key.clone(), user_bet);
+    }
+    
+    save(&mut bets_storage, &user_address.as_slice(), &user_bets)?;
+
+    //let mut bets_storage = PrefixedStorage::multilevel(&[BETS, &user_address.as_slice()], &mut deps.storage);
+    //let mut bets_store = AppendStoreMut::attach_or_create(&mut bets_storage)?;
+    //bets_store.push(&user_bet)?;
 
     // add the bet number to the additional entropy array
     // As on ChaChaRng only up to 8 words are used, and 2 of them are the base entropy and the entropy sent by the trigger we will save only 6 users entropy on this array
@@ -257,8 +284,56 @@ pub fn try_withdrawl<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
     env: Env,
     tier: i8,
-    round: i128
+    round: u32
 ) -> StdResult<HandleResponse> {
+    let user_address = deps.api.canonical_address(&env.message.sender)?;
+
+    // Check if user bet on this tier/round
+    let mapping_key: String = "tier".to_owned() + &tier.to_string() + "_" + "round" + &round.to_string();
+    let mut bets_storage = PrefixedStorage::new(BETS, &mut deps.storage);
+    let user_bets: Option<UserBetsStruct> = may_load(&bets_storage, &user_address.as_slice())?;
+
+    if user_bets.clone() == None || !user_bets.clone().unwrap().bets.contains_key(&mapping_key) {
+        return Err(StdError::generic_err(format!(
+            "User does not have any redeemable bet on this tier/round!"
+        )));
+    }
+
+    // check the user bet state
+    let this_user_bets = user_bets.unwrap().bets;
+    let this_user_bet = this_user_bets.get(&mapping_key).unwrap();
+
+    if this_user_bet.claimed_reward {
+        return Err(StdError::generic_err(format!(
+            "This user already claimed the reward for this tier/round!"
+        )));
+    }
+
+    // get that tier/round state
+    let tier_rounds_key: String = "tier".to_owned()  + &tier.to_string();
+    let mut tier_rounds = PrefixedStorage::multilevel(&[ROUNDS_STATE, &tier_rounds_key.as_bytes()], &mut deps.storage);
+    let mut tier_rounds_store: AppendStoreMut<RoundStruct, _> = AppendStoreMut::attach_or_create(&mut tier_rounds)?;
+    let mut round_state = tier_rounds_store.get_at(round).unwrap();
+
+    // check if round is finished with the lucky number field
+    if round_state.lucky_number == None {
+        // if it is not finished, the user wants to withdrawl his bet!
+
+    } else {
+        // the round is finished so the user wants to redeem the reward
+
+        // check if user is not winner
+        if round_state.lucky_number.unwrap() != this_user_bet.number {
+            return Err(StdError::generic_err(format!(
+                "User is not a winner! The bet number is not equal to the lucky number for this tier/round!"
+            )));
+        }
+
+        // winner logic!
+
+
+    }
+
     Ok(HandleResponse::default())
 }
 
@@ -411,6 +486,7 @@ pub fn query<S: Storage, A: Api, Q: Querier>(
 ) -> StdResult<Binary> {
     match msg {
         QueryMsg::GetTriggerer {} => to_binary(&query_triggerer(deps)?),
+        QueryMsg::GetUserBets { user_address} => to_binary(&query_user_bets(deps, user_address)?),
         QueryMsg::GetRounds {tier1, tier2, tier3, page, page_size} => to_binary(&query_rounds(deps,tier1, tier2, tier3, page, page_size)?),
     }
 }
@@ -422,6 +498,31 @@ fn query_triggerer<S: Storage, A: Api, Q: Querier>(deps: &Extern<S, A, Q>) -> Qu
     to_binary(&QueryAnswer::GetTriggerer {
         triggerer: triggerer_address
     })
+}
+
+fn query_user_bets<S: Storage, A: Api, Q: Querier>(deps: &Extern<S, A, Q>, user_address: HumanAddr) -> QueryResult  {
+    let user_address_canonical = &deps.api.canonical_address(&user_address)?;
+
+    let bets_storage = ReadonlyPrefixedStorage::new(BETS, &deps.storage);
+    let user_bets: Option<UserBetsStruct> = load(&bets_storage, &user_address_canonical.as_slice())?;
+
+    let mut user_bets_vec = vec![];
+
+    if user_bets != None {
+        for key in user_bets.clone().unwrap().bet_keys.iter() {
+            user_bets_vec.push(user_bets.clone().unwrap().bets[key].clone())
+        }
+
+        to_binary(&QueryAnswer::GetUserBets {
+            user_bet_keys: user_bets.unwrap().bet_keys,
+            user_bets: user_bets_vec
+        })
+    } else {
+        to_binary(&QueryAnswer::GetUserBets {
+            user_bet_keys: vec![],
+            user_bets: user_bets_vec
+        })
+    }
 }
 
 fn query_rounds<S: Storage, A: Api, Q: Querier>(
@@ -508,76 +609,3 @@ fn query_rounds<S: Storage, A: Api, Q: Querier>(
         tier3_rounds
     })
 }
-
-/* 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use cosmwasm_std::testing::{mock_dependencies, mock_env};
-    use cosmwasm_std::{coins, from_binary, StdError};
-
-    #[test]
-    fn proper_initialization() {
-        let mut deps = mock_dependencies(20, &[]);
-
-        let msg = InitMsg { count: 17 };
-        let env = mock_env("creator", &coins(1000, "earth"));
-
-        // we can just call .unwrap() to assert this was a success
-        let res = init(&mut deps, env, msg).unwrap();
-        assert_eq!(0, res.messages.len());
-
-        // it worked, let's query the state
-        let res = query(&deps, QueryMsg::GetCount {}).unwrap();
-        let value: CountResponse = from_binary(&res).unwrap();
-        assert_eq!(17, value.count);
-    }
-
-    #[test]
-    fn increment() {
-        let mut deps = mock_dependencies(20, &coins(2, "token"));
-
-        let msg = InitMsg { count: 17 };
-        let env = mock_env("creator", &coins(2, "token"));
-        let _res = init(&mut deps, env, msg).unwrap();
-
-        // anyone can increment
-        let env = mock_env("anyone", &coins(2, "token"));
-        let msg = HandleMsg::Increment {};
-        let _res = handle(&mut deps, env, msg).unwrap();
-
-        // should increase counter by 1
-        let res = query(&deps, QueryMsg::GetCount {}).unwrap();
-        let value: CountResponse = from_binary(&res).unwrap();
-        assert_eq!(18, value.count);
-    }
-
-    #[test]
-    fn reset() {
-        let mut deps = mock_dependencies(20, &coins(2, "token"));
-
-        let msg = InitMsg { count: 17 };
-        let env = mock_env("creator", &coins(2, "token"));
-        let _res = init(&mut deps, env, msg).unwrap();
-
-        // not anyone can reset
-        let unauth_env = mock_env("anyone", &coins(2, "token"));
-        let msg = HandleMsg::Reset { count: 5 };
-        let res = handle(&mut deps, unauth_env, msg);
-        match res {
-            Err(StdError::Unauthorized { .. }) => {}
-            _ => panic!("Must return unauthorized error"),
-        }
-
-        // only the original creator can reset the counter
-        let auth_env = mock_env("creator", &coins(2, "token"));
-        let msg = HandleMsg::Reset { count: 5 };
-        let _res = handle(&mut deps, auth_env, msg).unwrap();
-
-        // should now be 5
-        let res = query(&deps, QueryMsg::GetCount {}).unwrap();
-        let value: CountResponse = from_binary(&res).unwrap();
-        assert_eq!(5, value.count);
-    }
-}
-*/

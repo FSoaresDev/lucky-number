@@ -16,11 +16,19 @@
     {
       "type": "object",
       "required": [
-        "get_entropy"
+        "get_user_bets"
       ],
       "properties": {
-        "get_entropy": {
-          "type": "object"
+        "get_user_bets": {
+          "type": "object",
+          "required": [
+            "user_address"
+          ],
+          "properties": {
+            "user_address": {
+              "$ref": "#/definitions/HumanAddr"
+            }
+          }
         }
       }
     },
@@ -63,5 +71,10 @@
         }
       }
     }
-  ]
+  ],
+  "definitions": {
+    "HumanAddr": {
+      "type": "string"
+    }
+  }
 }

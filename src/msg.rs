@@ -2,7 +2,7 @@ use cosmwasm_std::{Binary, HumanAddr, Uint128};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::state::RoundStruct;
+use crate::state::{RoundStruct, UserBetStruct, UserBetsStruct};
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct InitMsg {
@@ -29,7 +29,7 @@ pub struct InitMsg {
 pub enum HandleMsg {
     Receive { sender: HumanAddr, from: HumanAddr, amount: Uint128, msg: Option<Binary> },
     Bet {tier: i8, number: i16},
-    Withdrawl {tier: i8, round: i128 },
+    Withdrawl {tier: i8, round: u32 },
     ChangeTriggerer { triggerer: HumanAddr},
     ChangeTier { tier: i8, entry_fee: Uint128, triggerer_fee: Uint128, min_entries: i16, max_rand_number: i16 },
     TriggerLuckyNumber {tier1: bool, tier2: bool, tier3: bool, entropy: u64}
@@ -40,6 +40,7 @@ pub enum HandleMsg {
 pub enum QueryMsg {
     // GetCount returns the current count as a json-encoded number
     GetTriggerer {},
+    GetUserBets {user_address: HumanAddr},
     GetRounds { tier1: bool, tier2: bool, tier3: bool, page: u32, page_size: u32}
 }
 
@@ -84,6 +85,10 @@ impl Snip20Msg {
 pub enum QueryAnswer {
     GetTriggerer {
         triggerer: HumanAddr
+    },
+    GetUserBets {
+        user_bet_keys: Vec<String>,
+        user_bets: Vec<UserBetStruct>
     },
     GetRounds { 
         tier1_rounds: Option<Vec<RoundStruct>>,
