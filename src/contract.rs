@@ -1,10 +1,10 @@
 use std::{collections::HashMap, hash::Hash, path::Prefix};
 
-use cosmwasm_std::{Api, Binary, CanonicalAddr, CosmosMsg, Env, Extern, HandleResponse, HumanAddr, InitResponse, LogAttribute, Querier, QueryResult, StdError, StdResult, Storage, Uint128, WasmMsg, from_binary, to_binary};
+use cosmwasm_std::{Api, Binary, CanonicalAddr, CosmosMsg, Empty, Env, Extern, HandleResponse, HumanAddr, InitResponse, LogAttribute, Querier, QueryResult, StdError, StdResult, Storage, Uint128, WasmMsg, from_binary, to_binary};
 use cosmwasm_storage::{PrefixedStorage, ReadonlyPrefixedStorage};
 use rand::Rng;
 use rand_chacha::ChaChaRng;
-use secret_toolkit::storage::{AppendStore, AppendStoreMut, TypedStore};
+use secret_toolkit::{snip20::transfer_msg, storage::{AppendStore, AppendStoreMut, TypedStore}};
 use sha2::{Digest, Sha256};
 use rand_core::SeedableRng;
 use crate::{msg::{CountResponse, HandleMsg, InitMsg, QueryAnswer, QueryMsg, Snip20Msg}, rand::sha_256, state::{RoundStruct, UserBetStruct, UserBetsStruct, load, may_load, save}};
@@ -42,7 +42,7 @@ pub fn init<S: Storage, A: Api, Q: Querier>(
     let mut config_data = PrefixedStorage::new(CONFIG_DATA, &mut deps.storage);
     save(&mut config_data, b"owner", &deps.api.canonical_address(&env.message.sender)?)?;
     save(&mut config_data, b"triggerer", &msg.triggerer_address)?;
-    save(&mut config_data, b"token_address", &deps.api.canonical_address(&msg.token_address)?)?;
+    save(&mut config_data, b"token_address", &msg.token_address)?;
     save(&mut config_data, b"token_hash", &msg.token_hash)?;
     save(&mut config_data, b"entropy", &prng_seed)?;
     save(&mut config_data, b"base_entropy", &msg.entropy.clone().to_be_bytes())?;
@@ -198,48 +198,32 @@ pub fn try_bet<S: Storage, A: Api, Q: Querier>(
         )));
     }
 
-    /*let mapping_key: String = "tier".to_owned() + &tier.to_string() + "_" + "round" + &current_round_state.round_number.to_string() + "_" + &user_address.to_string();
-    let mut mappings = PrefixedStorage::new(MAPPING_BETS_TO_ROUNDS, &mut deps.storage);
-    let map_result: Result<bool,StdError> = load(&mappings, mapping_key.as_bytes());
- 
-    if !map_result.is_err() && map_result.unwrap() == true {
-        return Err(StdError::generic_err(format!(
-            "User already bet on this round / tier."
-        )));
-    }
- 
-    save(&mut mappings, mapping_key.as_bytes(), &true)?;
-*/
-
     //add user bet
-    
     let user_bet: UserBetStruct = UserBetStruct {
-        round_number: 0,
+        round_number: current_round_state.round_number,
         tier,
         number,
         claimed_reward: false,
         timestamp: env.block.time
     };
 
+    let mut user_bets_modified;
     // { <user_address>: { "bet_keys": [...], "bets": {...} } }
-    if user_bets.clone() == None {
+    if user_bets == None {
         let mut hashmap: HashMap<String, UserBetStruct> = HashMap::new();
         hashmap.insert(mapping_key.clone(), user_bet);
 
-        user_bets = Some(UserBetsStruct {
+        user_bets_modified = UserBetsStruct {
             bet_keys: vec![ mapping_key.clone() ],
             bets: hashmap
-        })
+        }
     } else {
-        user_bets.clone().unwrap().bet_keys.push(mapping_key.clone());
-        user_bets.clone().unwrap().bets.insert(mapping_key.clone(), user_bet);
+        user_bets_modified = user_bets.unwrap();
+        user_bets_modified.bet_keys.push(mapping_key.clone());
+        user_bets_modified.bets.insert(mapping_key.clone(), user_bet);
     }
     
-    save(&mut bets_storage, &user_address.as_slice(), &user_bets)?;
-
-    //let mut bets_storage = PrefixedStorage::multilevel(&[BETS, &user_address.as_slice()], &mut deps.storage);
-    //let mut bets_store = AppendStoreMut::attach_or_create(&mut bets_storage)?;
-    //bets_store.push(&user_bet)?;
+    save(&mut bets_storage, &user_address.as_slice(), &Some(user_bets_modified))?;
 
     // add the bet number to the additional entropy array
     // As on ChaChaRng only up to 8 words are used, and 2 of them are the base entropy and the entropy sent by the trigger we will save only 6 users entropy on this array
@@ -288,10 +272,35 @@ pub fn try_withdrawl<S: Storage, A: Api, Q: Querier>(
 ) -> StdResult<HandleResponse> {
     let user_address = deps.api.canonical_address(&env.message.sender)?;
 
+    // check the tier entry amount
+    let tier_config_key = 
+    if tier == 1 { LUCKY_NUMBER_CONFIG_TIER_1 } 
+        else if tier == 2 { LUCKY_NUMBER_CONFIG_TIER_2 } 
+        else if tier == 3 { LUCKY_NUMBER_CONFIG_TIER_3 } 
+        else { 
+                    return Err(StdError::generic_err(format!(
+                        "Tier invalid"
+                    )));
+        };
+
+    let tier_config = ReadonlyPrefixedStorage::new(tier_config_key, &deps.storage);
+    let entry_fee_tier: Uint128 = load(&tier_config, b"entry_fee").unwrap();
+
+    //get transfer token info
+    let config_data = ReadonlyPrefixedStorage::new(CONFIG_DATA, &deps.storage);
+    let token_address: HumanAddr = load(&config_data, b"token_address").unwrap();
+    let token_hash: String  = load(&config_data, b"token_hash").unwrap();
+
+    // get that tier/round state
+    let tier_rounds_key: String = "tier".to_owned()  + &tier.to_string();
+    let tier_rounds = ReadonlyPrefixedStorage::multilevel(&[ROUNDS_STATE, &tier_rounds_key.as_bytes()], &deps.storage);
+    let tier_rounds_store: AppendStore<RoundStruct, _> = AppendStore::attach(&tier_rounds).unwrap().unwrap();
+    let round_state = tier_rounds_store.get_at(round).unwrap();
+     
     // Check if user bet on this tier/round
     let mapping_key: String = "tier".to_owned() + &tier.to_string() + "_" + "round" + &round.to_string();
-    let mut bets_storage = PrefixedStorage::new(BETS, &mut deps.storage);
-    let user_bets: Option<UserBetsStruct> = may_load(&bets_storage, &user_address.as_slice())?;
+    let mut bets_storage = ReadonlyPrefixedStorage::new(BETS, &deps.storage);
+    let user_bets: Option<UserBetsStruct> = load(&bets_storage, &user_address.as_slice())?;
 
     if user_bets.clone() == None || !user_bets.clone().unwrap().bets.contains_key(&mapping_key) {
         return Err(StdError::generic_err(format!(
@@ -300,38 +309,76 @@ pub fn try_withdrawl<S: Storage, A: Api, Q: Querier>(
     }
 
     // check the user bet state
-    let this_user_bets = user_bets.unwrap().bets;
-    let this_user_bet = this_user_bets.get(&mapping_key).unwrap();
+    let mut this_user_bets = user_bets.unwrap();
 
-    if this_user_bet.claimed_reward {
+    if this_user_bets.bets.get(&mapping_key).unwrap().claimed_reward {
         return Err(StdError::generic_err(format!(
             "This user already claimed the reward for this tier/round!"
         )));
     }
 
-    // get that tier/round state
-    let tier_rounds_key: String = "tier".to_owned()  + &tier.to_string();
-    let mut tier_rounds = PrefixedStorage::multilevel(&[ROUNDS_STATE, &tier_rounds_key.as_bytes()], &mut deps.storage);
-    let mut tier_rounds_store: AppendStoreMut<RoundStruct, _> = AppendStoreMut::attach_or_create(&mut tier_rounds)?;
-    let mut round_state = tier_rounds_store.get_at(round).unwrap();
-
     // check if round is finished with the lucky number field
     if round_state.lucky_number == None {
-        // if it is not finished, the user wants to withdrawl his bet!
+        // if the round is not finished, the user wants to withdrawl his bet!
 
+        // transfer the tokens
+        transfer_msg(
+            env.message.sender.clone(),
+            entry_fee_tier,
+            None,
+            BLOCK_SIZE,
+            token_hash,
+            token_address
+        ).unwrap();       
+
+        // clear round state
+        let mut tier_rounds = PrefixedStorage::multilevel(&[ROUNDS_STATE, &tier_rounds_key.as_bytes()], &mut deps.storage);
+        let mut tier_rounds_store: AppendStoreMut<RoundStruct, _> = AppendStoreMut::attach_or_create(&mut tier_rounds)?;
+        let mut round_state = tier_rounds_store.get_at(round).unwrap();
+
+        round_state.users_count = round_state.users_count - 1;
+        round_state.pool_size = (round_state.pool_size - entry_fee_tier)?;
+        round_state.users_picked_numbers_count[this_user_bets.bets.get(&mapping_key).unwrap().number as usize - 1] = round_state.users_picked_numbers_count[this_user_bets.bets.get(&mapping_key).unwrap().number as usize - 1] - 1;
+   
+        tier_rounds_store.set_at(round_state.round_number,&round_state);
+
+        // clear user bets
+        let mut bets_storage = PrefixedStorage::new(BETS, &mut deps.storage);
+        if let Some(index) = this_user_bets.bet_keys.iter().position(|value| *value == mapping_key) {
+            this_user_bets.bet_keys.remove(index);
+        } 
+        this_user_bets.bets.remove(&mapping_key.clone());
+        save(&mut bets_storage, &user_address.as_slice(), &this_user_bets)?;
     } else {
         // the round is finished so the user wants to redeem the reward
 
         // check if user is not winner
-        if round_state.lucky_number.unwrap() != this_user_bet.number {
+        if round_state.lucky_number.unwrap() != this_user_bets.bets.get(&mapping_key).unwrap().number {
             return Err(StdError::generic_err(format!(
                 "User is not a winner! The bet number is not equal to the lucky number for this tier/round!"
             )));
         }
 
         // winner logic!
+        
+        let win_players_count = (round_state.users_picked_numbers_count.get((round_state.lucky_number.unwrap() - 1) as usize)).unwrap();
 
+        let amount_for_this_winner = round_state.pool_size.multiply_ratio(Uint128(1), Uint128(*win_players_count as u128));
 
+        transfer_msg(
+            env.message.sender.clone(),
+            amount_for_this_winner,
+            None,
+            BLOCK_SIZE,
+            token_hash,
+            token_address
+        ).unwrap();       
+
+        // update user bets
+        let mut bets_storage = PrefixedStorage::new(BETS, &mut deps.storage);
+        this_user_bets.bets.entry(tier_rounds_key).and_modify(|e| e.claimed_reward = true);
+
+        save(&mut bets_storage, &user_address.as_slice(), &this_user_bets)?;
     }
 
     Ok(HandleResponse::default())

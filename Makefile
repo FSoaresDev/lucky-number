@@ -94,7 +94,6 @@ get-rounds:
 hashes:
 	docker exec secretdev secretcli query compute tx $(TX)
 	
-	
 .PHONY: deploy
 deploy:
 	bash deploy/testnet.sh
