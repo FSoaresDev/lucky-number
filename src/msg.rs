@@ -96,3 +96,22 @@ pub enum QueryAnswer {
         tier3_rounds: Option<Vec<RoundStruct>>
     }
 }
+
+#[derive(Serialize, Deserialize, Debug, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum HandleAnswer {
+    /// generic status response
+    Status {
+        /// success or failure
+        status: ResponseStatus,
+        /// execution description
+        #[serde(skip_serializing_if = "Option::is_none")]
+        message: Option<String>,
+    },
+}
+/// success or failure response
+#[derive(Serialize, Deserialize, Debug, JsonSchema)]
+pub enum ResponseStatus {
+    Success,
+    Failure,
+}

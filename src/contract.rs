@@ -7,7 +7,7 @@ use rand_chacha::ChaChaRng;
 use secret_toolkit::{snip20::transfer_msg, storage::{AppendStore, AppendStoreMut, TypedStore}};
 use sha2::{Digest, Sha256};
 use rand_core::SeedableRng;
-use crate::{msg::{CountResponse, HandleMsg, InitMsg, QueryAnswer, QueryMsg, Snip20Msg}, rand::sha_256, state::{RoundStruct, UserBetStruct, UserBetsStruct, load, may_load, save}};
+use crate::{msg::{CountResponse, HandleAnswer, HandleMsg, InitMsg, QueryAnswer, QueryMsg, ResponseStatus, Snip20Msg}, rand::sha_256, state::{RoundStruct, UserBetStruct, UserBetsStruct, load, may_load, save}};
 
 /*
     5 min Lucky Number =>  1 sSCRT => 1 - 5
@@ -317,19 +317,21 @@ pub fn try_withdrawl<S: Storage, A: Api, Q: Querier>(
         )));
     }
 
+    let mut transfer_result: CosmosMsg = CosmosMsg::Custom(Empty {});
+
     // check if round is finished with the lucky number field
     if round_state.lucky_number == None {
         // if the round is not finished, the user wants to withdrawl his bet!
 
         // transfer the tokens
-        transfer_msg(
+        transfer_result = transfer_msg(
             env.message.sender.clone(),
             entry_fee_tier,
             None,
             BLOCK_SIZE,
             token_hash,
             token_address
-        ).unwrap();       
+        ).unwrap();
 
         // clear round state
         let mut tier_rounds = PrefixedStorage::multilevel(&[ROUNDS_STATE, &tier_rounds_key.as_bytes()], &mut deps.storage);
@@ -360,12 +362,10 @@ pub fn try_withdrawl<S: Storage, A: Api, Q: Querier>(
         }
 
         // winner logic!
-        
-        let win_players_count = (round_state.users_picked_numbers_count.get((round_state.lucky_number.unwrap() - 1) as usize)).unwrap();
+        let win_players_count: u128 = *(round_state.users_picked_numbers_count.get((round_state.lucky_number.unwrap() - 1) as usize)).unwrap() as u128;
+        let amount_for_this_winner = round_state.pool_size.multiply_ratio(Uint128(1), Uint128(win_players_count));
 
-        let amount_for_this_winner = round_state.pool_size.multiply_ratio(Uint128(1), Uint128(*win_players_count as u128));
-
-        transfer_msg(
+        transfer_result = transfer_msg(
             env.message.sender.clone(),
             amount_for_this_winner,
             None,
@@ -374,6 +374,7 @@ pub fn try_withdrawl<S: Storage, A: Api, Q: Querier>(
             token_address
         ).unwrap();       
 
+        //
         // update user bets
         let mut bets_storage = PrefixedStorage::new(BETS, &mut deps.storage);
         this_user_bets.bets.entry(tier_rounds_key).and_modify(|e| e.claimed_reward = true);
@@ -381,7 +382,16 @@ pub fn try_withdrawl<S: Storage, A: Api, Q: Querier>(
         save(&mut bets_storage, &user_address.as_slice(), &this_user_bets)?;
     }
 
-    Ok(HandleResponse::default())
+    Ok(HandleResponse {
+        messages: vec![
+            transfer_result
+        ],
+        log: vec![],
+        data: Some(to_binary(&HandleAnswer::Status {
+            status: ResponseStatus::Success,
+            message: None,
+        })?),
+    })
 }
 
 pub fn try_trigger_lucky_number<S: Storage, A: Api, Q: Querier>(

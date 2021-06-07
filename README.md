@@ -1,3 +1,2 @@
-* Do the withdrawl and test
+* Fee for the triggerer, on the trigger event!
 * User View keys to see bets
-* Fee for the triggerer

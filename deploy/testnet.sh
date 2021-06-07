@@ -62,17 +62,17 @@ sleep 10
 msg=$(base64 -w 0 <<<'{"bet": {"tier": 3, "number": 1}}')
 secretcli tx compute execute secret1s7c6xp9wltthk5r6mmavql4xld5me3g37guhsx '{"send":{"recipient": '$contract_address', "amount": "1000000", "msg": "'"$msg"'"}}' --from test1 -y --gas 1500000 -b block
 
+msg=$(base64 -w 0 <<<'{"bet": {"tier": 3, "number": 2}}')
+secretcli tx compute execute secret1s7c6xp9wltthk5r6mmavql4xld5me3g37guhsx '{"send":{"recipient": '$contract_address', "amount": "1000000", "msg": "'"$msg"'"}}' --from test2 -y --gas 1500000 -b block
+
+msg=$(base64 -w 0 <<<'{"bet": {"tier": 3, "number": 3}}')
+secretcli tx compute execute secret1s7c6xp9wltthk5r6mmavql4xld5me3g37guhsx '{"send":{"recipient": '$contract_address', "amount": "1000000", "msg": "'"$msg"'"}}' --from test3 -y --gas 1500000 -b block
+
 msg=$(base64 -w 0 <<<'{"bet": {"tier": 3, "number": 4}}')
-#secretcli tx compute execute secret1s7c6xp9wltthk5r6mmavql4xld5me3g37guhsx '{"send":{"recipient": '$contract_address', "amount": "1000000", "msg": "'"$msg"'"}}' --from test2 -y --gas 1500000 -b block
+secretcli tx compute execute secret1s7c6xp9wltthk5r6mmavql4xld5me3g37guhsx '{"send":{"recipient": '$contract_address', "amount": "1000000", "msg": "'"$msg"'"}}' --from test4 -y --gas 1500000 -b block
 
 msg=$(base64 -w 0 <<<'{"bet": {"tier": 3, "number": 5}}')
-#secretcli tx compute execute secret1s7c6xp9wltthk5r6mmavql4xld5me3g37guhsx '{"send":{"recipient": '$contract_address', "amount": "1000000", "msg": "'"$msg"'"}}' --from test3 -y --gas 1500000 -b block
-
-msg=$(base64 -w 0 <<<'{"bet": {"tier": 3, "number": 1}}')
-#secretcli tx compute execute secret1s7c6xp9wltthk5r6mmavql4xld5me3g37guhsx '{"send":{"recipient": '$contract_address', "amount": "1000000", "msg": "'"$msg"'"}}' --from test4 -y --gas 1500000 -b block
-
-msg=$(base64 -w 0 <<<'{"bet": {"tier": 3, "number": 4}}')
-#secretcli tx compute execute secret1s7c6xp9wltthk5r6mmavql4xld5me3g37guhsx '{"send":{"recipient": '$contract_address', "amount": "1000000", "msg": "'"$msg"'"}}' --from test5 -y --gas 1500000 -b block
+secretcli tx compute execute secret1s7c6xp9wltthk5r6mmavql4xld5me3g37guhsx '{"send":{"recipient": '$contract_address', "amount": "1000000", "msg": "'"$msg"'"}}' --from test5 -y --gas 1500000 -b block
 
 sleep 5
 
@@ -80,25 +80,21 @@ sleep 5
 secretcli q compute query $contract_address_without_quotes '{"get_rounds": {"tier1": true, "tier2": true, "tier3": true, "page_size": 10, "page": 0 }}' | base64 --decode --ignore-garbage
 
 # trigger
-#secretcli tx compute execute $contract_address_without_quotes '{"trigger_lucky_number":{"tier1": true, "tier2": true, "tier3": true, "entropy": 1234}}' --from test1 -y --gas 1500000 -b block
+secretcli tx compute execute $contract_address_without_quotes '{"trigger_lucky_number":{"tier1": true, "tier2": true, "tier3": true, "entropy": 1234}}' --from test1 -y --gas 1500000 -b block
 
 # get user bets
 secretcli q compute query $contract_address_without_quotes '{"get_user_bets": {"user_address": "secret1kw78ltg8380qdrag6puknyk0stdhh4nj68aqj9"}}' | base64 --decode --ignore-garbage
 
 # withdraw
-#secretcli tx compute execute $contract_address_without_quotes '{"withdrawl":{"tier": 3, "round": 0}}' --from test1 -y --gas 1500000 -b block
-
-# WIDTHDRAW TRANSFER SSCRT NOT WORKING
-
+secretcli tx compute execute $contract_address_without_quotes '{"withdrawl":{"tier": 3, "round": 0}}' --from test2 -y --gas 1500000 -b block
 
 #secretcli q compute query secret1v9w7798n4dv9rphcl6983az53ywzrzwtuzz8ry '{"get_user_bets": {"user_address": "secret1kw78ltg8380qdrag6puknyk0stdhh4nj68aqj9"}}' | base64 --decode --ignore-garbage
 
-#secretcli q compute query secret1v9w7798n4dv9rphcl6983az53ywzrzwtuzz8ry '{"get_rounds": {"tier1": true, "tier2": true, "tier3": true, "page_size": 10, "page": 0 }}' | base64 --decode --ignore-garbage
+#secretcli q compute query secret1293xv5fwuzyzggc4cuvdhgffygwctusknnqm0f '{"get_rounds": {"tier1": true, "tier2": true, "tier3": true, "page_size": 10, "page": 0 }}' | base64 --decode --ignore-garbage
 
-#secretcli tx compute execute secret1v9w7798n4dv9rphcl6983az53ywzrzwtuzz8ry '{"withdrawl":{"tier": 3, "round": 0}}' --from test1 -y --gas 1500000 -b block
+#secretcli tx compute execute secret15xagq5alhk5wvksc08efnz4pzvp2vuxe0zpj2u '{"withdrawl":{"tier": 3, "round": 0}}' --from test2 -y --gas 1500000 -b block
 
 #msg=$(base64 -w 0 <<<'{"bet": {"tier": 3, "number": 1}}')
 #secretcli tx compute execute secret1s7c6xp9wltthk5r6mmavql4xld5me3g37guhsx '{"send":{"recipient": "secret1v9w7798n4dv9rphcl6983az53ywzrzwtuzz8ry", "amount": "1000000", "msg": "'"$msg"'"}}' --from test1 -y --gas 1500000 -b block
 
 #secretcli q compute query  secret1s7c6xp9wltthk5r6mmavql4xld5me3g37guhsx '{"balance":{"address": "secret1kw78ltg8380qdrag6puknyk0stdhh4nj68aqj9", "key": "api_key_IwYF2GwgPAawIp7JgJJAJKE7uW/Sj/VVJDodcOSWsZQ="}}'
-
