@@ -402,9 +402,17 @@ pub fn try_trigger_lucky_number<S: Storage, A: Api, Q: Querier>(
     tier3: bool, 
     entropy: u64
 ) -> StdResult<HandleResponse> {
-    // TODO: check if it is the triggerer
-    
     let config_data = ReadonlyPrefixedStorage::new(CONFIG_DATA, &deps.storage);
+
+    let triggerer_address: HumanAddr = load(&config_data, b"triggerer").unwrap();
+    if triggerer_address != env.message.sender {
+        return Err(StdError::generic_err(format!(
+            "Not the valid triggerer!"
+        )));
+    }
+    let token_address: HumanAddr = load(&config_data, b"token_address").unwrap();
+    let token_hash: String  = load(&config_data, b"token_hash").unwrap();
+
     // Generate seed vector: original entropy + this request entropy + max 6 entropy stored from users
     let base_entropy = load(&config_data, b"base_entropy").unwrap();
     let mut addition_entropy: Vec<_> = load(&config_data, b"addition_entropy").unwrap();
@@ -420,12 +428,14 @@ pub fn try_trigger_lucky_number<S: Storage, A: Api, Q: Querier>(
     let mut lucky_number_tier_1: i16 = 0;
     let mut lucky_number_tier_2: i16 = 0;
     let mut lucky_number_tier_3: i16 = 0;
+    let mut transfer_result: CosmosMsg = CosmosMsg::Custom(Empty {});
 
     if tier1 == true {
         let tier1_config = ReadonlyPrefixedStorage::new(LUCKY_NUMBER_CONFIG_TIER_1, &deps.storage);
         let min_entries_tier1: i16 = load(&tier1_config, b"min_entries").unwrap();
         let entry_fee_tier1: Uint128 = load(&tier1_config, b"entry_fee").unwrap();
         let max_rand_number_tier1: i16 = load(&tier1_config, b"max_rand_number").unwrap();
+        let triggerer_fee_tier1: Uint128 = load(&tier1_config, b"triggerer_fee").unwrap();
 
         let mut tier1_rounds = PrefixedStorage::multilevel(&[ROUNDS_STATE, &"tier1".to_string().as_bytes()], &mut deps.storage);
         let mut tier1_rounds_store: AppendStoreMut<RoundStruct, _> = AppendStoreMut::attach_or_create(&mut tier1_rounds)?;
@@ -441,7 +451,18 @@ pub fn try_trigger_lucky_number<S: Storage, A: Api, Q: Querier>(
             let mut updated_round = tier1_cur_round;
             updated_round.lucky_number = Some(lucky_number_tier_1);
             updated_round.round_end_timestamp = Some(env.block.time);
+            updated_round.pool_size = (updated_round.pool_size - triggerer_fee_tier1)?;
             tier1_rounds_store.set_at(tier1_rounds_store.len()-1,&updated_round);
+
+            //send trigger fee to triggerer
+            transfer_result = transfer_msg(
+                triggerer_address.clone(),
+                triggerer_fee_tier1,
+                None,
+                BLOCK_SIZE,
+                token_hash.clone(),
+                token_address.clone()
+            ).unwrap();
 
             //new round
             let new_round: RoundStruct = RoundStruct {
@@ -461,6 +482,7 @@ pub fn try_trigger_lucky_number<S: Storage, A: Api, Q: Querier>(
         let min_entries_tier2: i16 = load(&tier2_config, b"min_entries").unwrap();
         let entry_fee_tier2: Uint128 = load(&tier2_config, b"entry_fee").unwrap();
         let max_rand_number_tier2: i16 = load(&tier2_config, b"max_rand_number").unwrap();
+        let triggerer_fee_tier2: Uint128 = load(&tier2_config, b"triggerer_fee").unwrap();
 
         let mut tier2_rounds = PrefixedStorage::multilevel(&[ROUNDS_STATE, &"tier2".to_string().as_bytes()], &mut deps.storage);
         let mut tier2_rounds_store: AppendStoreMut<RoundStruct, _> = AppendStoreMut::attach_or_create(&mut tier2_rounds)?;
@@ -476,7 +498,18 @@ pub fn try_trigger_lucky_number<S: Storage, A: Api, Q: Querier>(
             let mut updated_round = tier2_cur_round;
             updated_round.lucky_number = Some(lucky_number_tier_2);
             updated_round.round_end_timestamp = Some(env.block.time);
+            updated_round.pool_size = (updated_round.pool_size - triggerer_fee_tier2)?;
             tier2_rounds_store.set_at(tier2_rounds_store.len()-1,&updated_round);
+
+            //send trigger fee to triggerer
+            transfer_result = transfer_msg(
+                triggerer_address.clone(),
+                triggerer_fee_tier2,
+                None,
+                BLOCK_SIZE,
+                token_hash.clone(),
+                token_address.clone()
+            ).unwrap();
 
             //new round
             let new_round: RoundStruct = RoundStruct {
@@ -496,6 +529,7 @@ pub fn try_trigger_lucky_number<S: Storage, A: Api, Q: Querier>(
         let min_entries_tier3: i16 = load(&tier3_config, b"min_entries").unwrap();
         let entry_fee_tier3: Uint128 = load(&tier3_config, b"entry_fee").unwrap();
         let max_rand_number_tier3: i16 = load(&tier3_config, b"max_rand_number").unwrap();
+        let triggerer_fee_tier3: Uint128 = load(&tier3_config, b"triggerer_fee").unwrap();
 
         let mut tier3_rounds = PrefixedStorage::multilevel(&[ROUNDS_STATE, &"tier3".to_string().as_bytes()], &mut deps.storage);
         let mut tier3_rounds_store: AppendStoreMut<RoundStruct, _> = AppendStoreMut::attach_or_create(&mut tier3_rounds)?;
@@ -511,7 +545,18 @@ pub fn try_trigger_lucky_number<S: Storage, A: Api, Q: Querier>(
             let mut updated_round = tier3_cur_round;
             updated_round.lucky_number = Some(lucky_number_tier_3);
             updated_round.round_end_timestamp = Some(env.block.time);
+            updated_round.pool_size = (updated_round.pool_size - triggerer_fee_tier3)?;
             tier3_rounds_store.set_at(tier3_rounds_store.len()-1,&updated_round);
+
+            //send trigger fee to triggerer
+            transfer_result = transfer_msg(
+                triggerer_address.clone(),
+                triggerer_fee_tier3,
+                None,
+                BLOCK_SIZE,
+                token_hash.clone(),
+                token_address.clone()
+            ).unwrap();
 
             //new round
             let new_round: RoundStruct = RoundStruct {
@@ -527,7 +572,9 @@ pub fn try_trigger_lucky_number<S: Storage, A: Api, Q: Querier>(
     }
 
     return Ok(HandleResponse {
-        messages: vec![],
+        messages: vec![
+            transfer_result
+        ],
         log: vec![
             LogAttribute {key: "lucky_number_tier_1".to_string(), value: lucky_number_tier_1.to_string()},
             LogAttribute {key: "lucky_number_tier_2".to_string(), value: lucky_number_tier_2.to_string()},
