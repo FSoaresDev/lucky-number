@@ -29,6 +29,7 @@ pub struct InitMsg {
 pub enum HandleMsg {
     Receive { sender: HumanAddr, from: HumanAddr, amount: Uint128, msg: Option<Binary> },
     Bet {tier: i8, number: i16},
+    CreateViewingKey {entropy: String },
     Withdrawl {tier: i8, round: u32 },
     ChangeTriggerer { triggerer: HumanAddr},
     ChangeTier { tier: i8, entry_fee: Uint128, triggerer_fee: Uint128, min_entries: i16, max_rand_number: i16 },
@@ -40,7 +41,7 @@ pub enum HandleMsg {
 pub enum QueryMsg {
     // GetCount returns the current count as a json-encoded number
     GetTriggerer {},
-    GetUserBets {user_address: HumanAddr},
+    GetUserBets {user_address: HumanAddr, viewing_key: String},
     GetRounds { tier1: bool, tier2: bool, tier3: bool, page: u32, page_size: u32}
 }
 
@@ -108,6 +109,7 @@ pub enum HandleAnswer {
         #[serde(skip_serializing_if = "Option::is_none")]
         message: Option<String>,
     },
+    ViewingKey { key: String },
 }
 /// success or failure response
 #[derive(Serialize, Deserialize, Debug, JsonSchema)]

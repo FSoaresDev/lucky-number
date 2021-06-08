@@ -22,11 +22,15 @@
         "get_user_bets": {
           "type": "object",
           "required": [
-            "user_address"
+            "user_address",
+            "viewing_key"
           ],
           "properties": {
             "user_address": {
               "$ref": "#/definitions/HumanAddr"
+            },
+            "viewing_key": {
+              "type": "string"
             }
           }
         }

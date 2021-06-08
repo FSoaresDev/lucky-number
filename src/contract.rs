@@ -1,13 +1,13 @@
 use std::{collections::HashMap, hash::Hash, path::Prefix};
 
-use cosmwasm_std::{Api, Binary, CanonicalAddr, CosmosMsg, Empty, Env, Extern, HandleResponse, HumanAddr, InitResponse, LogAttribute, Querier, QueryResult, StdError, StdResult, Storage, Uint128, WasmMsg, from_binary, to_binary};
+use cosmwasm_std::{Api, Binary, CanonicalAddr, CosmosMsg, Empty, Env, Extern, HandleResponse, HandleResult, HumanAddr, InitResponse, LogAttribute, Querier, QueryResult, ReadonlyStorage, StdError, StdResult, Storage, Uint128, WasmMsg, from_binary, to_binary};
 use cosmwasm_storage::{PrefixedStorage, ReadonlyPrefixedStorage};
 use rand::Rng;
 use rand_chacha::ChaChaRng;
 use secret_toolkit::{snip20::transfer_msg, storage::{AppendStore, AppendStoreMut, TypedStore}};
 use sha2::{Digest, Sha256};
 use rand_core::SeedableRng;
-use crate::{msg::{CountResponse, HandleAnswer, HandleMsg, InitMsg, QueryAnswer, QueryMsg, ResponseStatus, Snip20Msg}, rand::sha_256, state::{RoundStruct, UserBetStruct, UserBetsStruct, load, may_load, save}};
+use crate::{msg::{CountResponse, HandleAnswer, HandleMsg, InitMsg, QueryAnswer, QueryMsg, ResponseStatus, Snip20Msg}, rand::sha_256, state::{RoundStruct, UserBetStruct, UserBetsStruct, load, may_load, save}, viewing_key::{VIEWING_KEY_SIZE, ViewingKey}};
 
 /*
     5 min Lucky Number =>  1 sSCRT => 1 - 5
@@ -15,6 +15,7 @@ use crate::{msg::{CountResponse, HandleAnswer, HandleMsg, InitMsg, QueryAnswer, 
     12h Lucky Number =>  10 sSCRT => 1-30
 */
 pub const CONFIG_DATA: &[u8] = b"config";
+pub const PREFIX_VIEW_KEY: &[u8] = b"viewingkey";
 pub const LUCKY_NUMBER_CONFIG_TIER_1: &[u8] = b"tier1";
 pub const LUCKY_NUMBER_CONFIG_TIER_2: &[u8] = b"tier2";
 pub const LUCKY_NUMBER_CONFIG_TIER_3: &[u8] = b"tier3";
@@ -101,6 +102,9 @@ pub fn handle<S: Storage, A: Api, Q: Querier>(
     msg: HandleMsg,
 ) -> StdResult<HandleResponse> {
     match msg {
+        // Users
+        HandleMsg::CreateViewingKey { entropy } => try_create_key(deps, env, &entropy),
+
         // Bet
         HandleMsg::Receive { sender, from, amount, msg } => try_receive(deps, env, sender, from, amount, msg),
         HandleMsg::Withdrawl { tier, round } => try_withdrawl(deps, env, tier, round),
@@ -114,6 +118,28 @@ pub fn handle<S: Storage, A: Api, Q: Querier>(
 
         _ => Err(StdError::generic_err("Handler not found!"))
     }
+}
+
+fn try_create_key<S: Storage, A: Api, Q: Querier>(
+    deps: &mut Extern<S, A, Q>,
+    env: Env,
+    entropy: &str,
+) -> HandleResult {
+    // create and store the key
+    let config_data = ReadonlyPrefixedStorage::new(CONFIG_DATA, &deps.storage);
+    let entropy_base: Vec<u8> = load(&config_data, b"entropy").unwrap();
+    let key = ViewingKey::new(&env, &entropy_base, entropy.as_ref());
+    let message_sender = &deps.api.canonical_address(&env.message.sender)?;
+    let mut key_store = PrefixedStorage::new(PREFIX_VIEW_KEY, &mut deps.storage);
+    save(&mut key_store, message_sender.as_slice(), &key.to_hashed())?;
+
+    Ok(HandleResponse {
+        messages: vec![],
+        log: vec![],
+        data: Some(to_binary(&HandleAnswer::ViewingKey {
+            key: format!("{}", key),
+        })?),
+    })
 }
 
 pub fn try_receive<S: Storage, A: Api, Q: Querier>(
@@ -590,7 +616,7 @@ pub fn query<S: Storage, A: Api, Q: Querier>(
 ) -> StdResult<Binary> {
     match msg {
         QueryMsg::GetTriggerer {} => to_binary(&query_triggerer(deps)?),
-        QueryMsg::GetUserBets { user_address} => to_binary(&query_user_bets(deps, user_address)?),
+        QueryMsg::GetUserBets { user_address, viewing_key} => to_binary(&query_user_bets(deps, user_address, viewing_key)?),
         QueryMsg::GetRounds {tier1, tier2, tier3, page, page_size} => to_binary(&query_rounds(deps,tier1, tier2, tier3, page, page_size)?),
     }
 }
@@ -604,8 +630,14 @@ fn query_triggerer<S: Storage, A: Api, Q: Querier>(deps: &Extern<S, A, Q>) -> Qu
     })
 }
 
-fn query_user_bets<S: Storage, A: Api, Q: Querier>(deps: &Extern<S, A, Q>, user_address: HumanAddr) -> QueryResult  {
+fn query_user_bets<S: Storage, A: Api, Q: Querier>(deps: &Extern<S, A, Q>, user_address: HumanAddr, viewing_key: String) -> QueryResult  {
     let user_address_canonical = &deps.api.canonical_address(&user_address)?;
+
+    if !is_key_valid(&deps.storage, user_address_canonical, viewing_key)? {
+        return Err(StdError::generic_err(format!(
+            "User+VK not valid!"
+        )));
+    }
 
     let bets_storage = ReadonlyPrefixedStorage::new(BETS, &deps.storage);
     let user_bets: Option<UserBetsStruct> = load(&bets_storage, &user_address_canonical.as_slice())?;
@@ -712,4 +744,27 @@ fn query_rounds<S: Storage, A: Api, Q: Querier>(
         tier2_rounds,
         tier3_rounds
     })
+}
+
+fn is_key_valid<S: ReadonlyStorage>(
+    storage: &S,
+    address: &CanonicalAddr,
+    viewing_key: String,
+) -> StdResult<bool> {
+    // load the address' key
+    let read_key = ReadonlyPrefixedStorage::new(PREFIX_VIEW_KEY, storage);
+    let load_key: Option<[u8; VIEWING_KEY_SIZE]> = may_load(&read_key, address.as_slice())?;
+    let input_key = ViewingKey(viewing_key);
+    // if a key was set
+    if let Some(expected_key) = load_key {
+        // and it matches
+        if input_key.check_viewing_key(&expected_key) {
+            return Ok(true);
+        }
+    } else {
+        // Checking the key will take significant time. We don't want to exit immediately if it isn't set
+        // in a way which will allow to time the command and determine if a viewing key doesn't exist
+        input_key.check_viewing_key(&[0u8; VIEWING_KEY_SIZE]);
+    }
+    Ok(false)
 }

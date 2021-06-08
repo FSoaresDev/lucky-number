@@ -82,8 +82,11 @@ secretcli q compute query $contract_address_without_quotes '{"get_rounds": {"tie
 # trigger
 secretcli tx compute execute $contract_address_without_quotes '{"trigger_lucky_number":{"tier1": true, "tier2": true, "tier3": true, "entropy": 1234}}' --from test1 -y --gas 1500000 -b block
 
+# create VK
+secretcli tx compute execute $contract_address_without_quotes '{"create_viewing_key":{"entropy": "1231231"}}' --from test2 -y --gas 1500000 -b block
+
 # get user bets
-secretcli q compute query $contract_address_without_quotes '{"get_user_bets": {"user_address": "secret1kw78ltg8380qdrag6puknyk0stdhh4nj68aqj9"}}' | base64 --decode --ignore-garbage
+secretcli q compute query $contract_address_without_quotes '{"get_user_bets": {"user_address": "secret1ej0f8cz3537tnxjn6kpn7nda7zmwafzk6lu9vn", "viewing_key": ""}}' | base64 --decode --ignore-garbage
 
 # withdraw
 secretcli tx compute execute $contract_address_without_quotes '{"withdrawl":{"tier": 3, "round": 0}}' --from test2 -y --gas 1500000 -b block
