@@ -39,6 +39,7 @@ pub struct RoundStruct {
     pub lucky_number: Option<i16>,
     pub users_count: u32,
     pub round_end_timestamp: Option<u64>,
+    pub round_end_pool_size: Option<Uint128>,
     pub users_picked_numbers_count: Vec<u32>
 }
   

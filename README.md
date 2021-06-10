@@ -1,5 +1,5 @@
 # Current Testnet address
-secret1m4ez6yw8yr68fv8a8p744qqqpug6plnx9d4eny
+secret1n6a58wccfyrsk63x8zekgh8allcx3jt7mt80f5
 # TODO
 * Check Trigger
 * Change triggerer

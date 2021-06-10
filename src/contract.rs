@@ -36,6 +36,7 @@ pub fn init<S: Storage, A: Api, Q: Querier>(
         lucky_number: None,
         users_count: 0,
         round_end_timestamp: None,
+        round_end_pool_size: None,
         pool_size: Uint128(0),
         users_picked_numbers_count: vec![0; 0]
     };
@@ -478,6 +479,14 @@ pub fn try_trigger_lucky_number<S: Storage, A: Api, Q: Querier>(
             updated_round.lucky_number = Some(lucky_number_tier_1);
             updated_round.round_end_timestamp = Some(env.block.time);
             updated_round.pool_size = (updated_round.pool_size - triggerer_fee_tier1)?;
+            updated_round.round_end_pool_size = Some(updated_round.pool_size);
+            let mut next_round_pool_size = Uint128(0);
+            // Check if any winner, if not the pool size will transfer to the next round so this round state will be 0!
+            let win_players_count: u128 = *(updated_round.users_picked_numbers_count.get((lucky_number_tier_1 - 1) as usize)).unwrap() as u128;
+            if win_players_count == 0 {
+                next_round_pool_size = updated_round.pool_size;
+                updated_round.pool_size = Uint128(0);
+            }
             tier1_rounds_store.set_at(tier1_rounds_store.len()-1,&updated_round);
 
             //send trigger fee to triggerer
@@ -496,7 +505,8 @@ pub fn try_trigger_lucky_number<S: Storage, A: Api, Q: Querier>(
                 lucky_number: None,
                 users_count: 0,
                 round_end_timestamp: None,
-                pool_size: Uint128(0),
+                round_end_pool_size: None,
+                pool_size: next_round_pool_size,
                 users_picked_numbers_count: vec![0; (max_rand_number_tier1) as usize]
             };
             tier1_rounds_store.push(&new_round)?;
@@ -525,6 +535,14 @@ pub fn try_trigger_lucky_number<S: Storage, A: Api, Q: Querier>(
             updated_round.lucky_number = Some(lucky_number_tier_2);
             updated_round.round_end_timestamp = Some(env.block.time);
             updated_round.pool_size = (updated_round.pool_size - triggerer_fee_tier2)?;
+            updated_round.round_end_pool_size = Some(updated_round.pool_size);
+            let mut next_round_pool_size = Uint128(0);
+            // Check if any winner, if not the pool size will transfer to the next round so this round state will be 0!
+            let win_players_count: u128 = *(updated_round.users_picked_numbers_count.get((lucky_number_tier_2 - 1) as usize)).unwrap() as u128;
+            if win_players_count == 0 {
+                next_round_pool_size = updated_round.pool_size;
+                updated_round.pool_size = Uint128(0);
+            }
             tier2_rounds_store.set_at(tier2_rounds_store.len()-1,&updated_round);
 
             //send trigger fee to triggerer
@@ -543,7 +561,8 @@ pub fn try_trigger_lucky_number<S: Storage, A: Api, Q: Querier>(
                 lucky_number: None,
                 users_count: 0,
                 round_end_timestamp: None,
-                pool_size: Uint128(0),
+                round_end_pool_size: None,
+                pool_size: next_round_pool_size,
                 users_picked_numbers_count: vec![0; (max_rand_number_tier2) as usize]
             };
             tier2_rounds_store.push(&new_round)?;
@@ -572,6 +591,14 @@ pub fn try_trigger_lucky_number<S: Storage, A: Api, Q: Querier>(
             updated_round.lucky_number = Some(lucky_number_tier_3);
             updated_round.round_end_timestamp = Some(env.block.time);
             updated_round.pool_size = (updated_round.pool_size - triggerer_fee_tier3)?;
+            updated_round.round_end_pool_size = Some(updated_round.pool_size);
+            let mut next_round_pool_size = Uint128(0);
+            // Check if any winner, if not the pool size will transfer to the next round so this round state will be 0!
+            let win_players_count: u128 = *(updated_round.users_picked_numbers_count.get((lucky_number_tier_3 - 1) as usize)).unwrap() as u128;
+            if win_players_count == 0 {
+                next_round_pool_size = updated_round.pool_size;
+                updated_round.pool_size = Uint128(0);
+            }
             tier3_rounds_store.set_at(tier3_rounds_store.len()-1,&updated_round);
 
             //send trigger fee to triggerer
@@ -590,7 +617,8 @@ pub fn try_trigger_lucky_number<S: Storage, A: Api, Q: Querier>(
                 lucky_number: None,
                 users_count: 0,
                 round_end_timestamp: None,
-                pool_size: Uint128(0),
+                round_end_pool_size: None,
+                pool_size: next_round_pool_size,
                 users_picked_numbers_count: vec![0; (max_rand_number_tier3) as usize]
             };
             tier3_rounds_store.push(&new_round)?;

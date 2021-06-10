@@ -86,7 +86,7 @@ secretcli tx compute execute $contract_address_without_quotes '{"trigger_lucky_n
 secretcli tx compute execute $contract_address_without_quotes '{"create_viewing_key":{"entropy": "1231231"}}' --from test2 -y --gas 1500000 -b block
 
 # get user bets
-secretcli q compute query $contract_address_without_quotes '{"get_user_bets": {"user_address": "secret1ej0f8cz3537tnxjn6kpn7nda7zmwafzk6lu9vn", "viewing_key": ""}}' | base64 --decode --ignore-garbage
+secretcli q compute query $contract_address_without_quotes '{"get_user_bets": {"user_address": "secret1kw78ltg8380qdrag6puknyk0stdhh4nj68aqj9", "viewing_key": "/Sgx2v+2e/IJ7eIJcdRLbDg91mz3be6ZjuA0lTqWLdM="}}' | base64 --decode --ignore-garbage
 
 # withdraw
 secretcli tx compute execute $contract_address_without_quotes '{"withdrawl":{"tier": 3, "round": 0}}' --from test2 -y --gas 1500000 -b block
@@ -95,9 +95,11 @@ secretcli tx compute execute $contract_address_without_quotes '{"withdrawl":{"ti
 
 #secretcli q compute query secret1vkrgphn45944uekp7fn9hf5qzgzxpvq2h0mern '{"get_rounds": {"tier1": true, "tier2": true, "tier3": true, "page_size": 10, "page": 0 }}' | base64 --decode --ignore-garbage
 
-#secretcli tx compute execute secret1vkrgphn45944uekp7fn9hf5qzgzxpvq2h0mern '{"withdrawl":{"tier": 3, "round": 0}}' --from test2 -y --gas 1500000 -b block
+#secretcli tx compute execute secret1m4ez6yw8yr68fv8a8p744qqqpug6plnx9d4eny '{"withdrawl":{"tier": 3, "round": 0}}' --from test1 -y --gas 1500000 -b block
 
 #msg=$(base64 -w 0 <<<'{"bet": {"tier": 3, "number": 1}}')
-#secretcli tx compute execute secret1s7c6xp9wltthk5r6mmavql4xld5me3g37guhsx '{"send":{"recipient": "secret1v9w7798n4dv9rphcl6983az53ywzrzwtuzz8ry", "amount": "1000000", "msg": "'"$msg"'"}}' --from test1 -y --gas 1500000 -b block
+#secretcli tx compute execute secret1s7c6xp9wltthk5r6mmavql4xld5me3g37guhsx '{"send":{"recipient": "secret1nfycy4kdphekvdd75nvgu535wjg5jwjdakq5ec", "amount": "1000000", "msg": "'"$msg"'"}}' --from test1 -y --gas 1500000 -b block
 
 #secretcli q compute query  secret1s7c6xp9wltthk5r6mmavql4xld5me3g37guhsx '{"balance":{"address": "secret1kw78ltg8380qdrag6puknyk0stdhh4nj68aqj9", "key": "api_key_IwYF2GwgPAawIp7JgJJAJKE7uW/Sj/VVJDodcOSWsZQ="}}'
+
+secretcli tx compute execute secret1n6a58wccfyrsk63x8zekgh8allcx3jt7mt80f5 '{"trigger_lucky_number":{"tier1": true, "tier2": true, "tier3": true, "entropy": 1234}}' --from test1 -y --gas 1500000 -b block
