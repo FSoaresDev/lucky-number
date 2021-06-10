@@ -38,7 +38,8 @@ pub fn init<S: Storage, A: Api, Q: Querier>(
         round_end_timestamp: None,
         round_end_pool_size: None,
         pool_size: Uint128(0),
-        users_picked_numbers_count: vec![0; 0]
+        users_picked_numbers_count: vec![0; 0],
+        winner_users_count: None
     };
 
     let mut config_data = PrefixedStorage::new(CONFIG_DATA, &mut deps.storage);
@@ -217,14 +218,8 @@ pub fn try_bet<S: Storage, A: Api, Q: Querier>(
     // how do i know if this user already bet on that tier/round 
     let mapping_key: String = "tier".to_owned() + &tier.to_string() + "_" + "round" + &current_round_state.round_number.to_string();
     let mut bets_storage = PrefixedStorage::new(BETS, &mut deps.storage);
-    let mut user_bets: Option<UserBetsStruct> = may_load(&bets_storage, &user_address.as_slice())?;
-
-    if user_bets.clone() != None && user_bets.clone().unwrap().bets.contains_key(&mapping_key) {
-        return Err(StdError::generic_err(format!(
-            "User already bet on this round / tier."
-        )));
-    }
-
+    let user_bets: Result<Option<UserBetsStruct>,StdError> = load(&bets_storage, &user_address.as_slice());
+    
     //add user bet
     let user_bet: UserBetStruct = UserBetStruct {
         round_number: current_round_state.round_number,
@@ -233,10 +228,10 @@ pub fn try_bet<S: Storage, A: Api, Q: Querier>(
         claimed_reward: false,
         timestamp: env.block.time
     };
-
     let mut user_bets_modified;
+    
     // { <user_address>: { "bet_keys": [...], "bets": {...} } }
-    if user_bets == None {
+    if user_bets.is_err() {
         let mut hashmap: HashMap<String, UserBetStruct> = HashMap::new();
         hashmap.insert(mapping_key.clone(), user_bet);
 
@@ -245,11 +240,17 @@ pub fn try_bet<S: Storage, A: Api, Q: Querier>(
             bets: hashmap
         }
     } else {
-        user_bets_modified = user_bets.unwrap();
-        user_bets_modified.bet_keys.push(mapping_key.clone());
-        user_bets_modified.bets.insert(mapping_key.clone(), user_bet);
+        let user_bets_unwraped = user_bets.unwrap().unwrap();
+        if user_bets_unwraped.bets.contains_key(&mapping_key) {
+            return Err(StdError::generic_err(format!(
+                "User already bet on this round / tier."
+            )));
+       }
+       user_bets_modified = user_bets_unwraped;
+       user_bets_modified.bet_keys.push(mapping_key.clone());
+       user_bets_modified.bets.insert(mapping_key.clone(), user_bet);
     }
-    
+
     save(&mut bets_storage, &user_address.as_slice(), &Some(user_bets_modified))?;
 
     // add the bet number to the additional entropy array
@@ -373,11 +374,11 @@ pub fn try_withdrawl<S: Storage, A: Api, Q: Querier>(
 
         // clear user bets
         let mut bets_storage = PrefixedStorage::new(BETS, &mut deps.storage);
-        if let Some(index) = this_user_bets.bet_keys.iter().position(|value| *value == mapping_key) {
+        if let Some(index) = this_user_bets.bet_keys.iter().position(|value| value == &mapping_key) {
             this_user_bets.bet_keys.remove(index);
         } 
         this_user_bets.bets.remove(&mapping_key.clone());
-        save(&mut bets_storage, &user_address.as_slice(), &this_user_bets)?;
+        save(&mut bets_storage, &user_address.as_slice(), &Some(this_user_bets))?;
     } else {
         // the round is finished so the user wants to redeem the reward
 
@@ -404,9 +405,18 @@ pub fn try_withdrawl<S: Storage, A: Api, Q: Querier>(
         //
         // update user bets
         let mut bets_storage = PrefixedStorage::new(BETS, &mut deps.storage);
-        this_user_bets.bets.entry(tier_rounds_key).and_modify(|e| e.claimed_reward = true);
+        let current_bet_state =  this_user_bets.bets.get(&mapping_key);
+        if current_bet_state != None {
+            let mut new_bet_state: UserBetStruct = current_bet_state.unwrap().clone();
+            new_bet_state.claimed_reward = true;
+            this_user_bets.bets.insert(mapping_key, new_bet_state.to_owned());
+        } else {
+            return Err(StdError::generic_err(format!(
+                "Cannot Update User Bet state!"
+            )));
+        }
 
-        save(&mut bets_storage, &user_address.as_slice(), &this_user_bets)?;
+        save(&mut bets_storage, &user_address.as_slice(), &Some(this_user_bets))?;
     }
 
     Ok(HandleResponse {
@@ -483,6 +493,7 @@ pub fn try_trigger_lucky_number<S: Storage, A: Api, Q: Querier>(
             let mut next_round_pool_size = Uint128(0);
             // Check if any winner, if not the pool size will transfer to the next round so this round state will be 0!
             let win_players_count: u128 = *(updated_round.users_picked_numbers_count.get((lucky_number_tier_1 - 1) as usize)).unwrap() as u128;
+            updated_round.winner_users_count = Some(win_players_count as u32);
             if win_players_count == 0 {
                 next_round_pool_size = updated_round.pool_size;
                 updated_round.pool_size = Uint128(0);
@@ -507,7 +518,8 @@ pub fn try_trigger_lucky_number<S: Storage, A: Api, Q: Querier>(
                 round_end_timestamp: None,
                 round_end_pool_size: None,
                 pool_size: next_round_pool_size,
-                users_picked_numbers_count: vec![0; (max_rand_number_tier1) as usize]
+                users_picked_numbers_count: vec![0; (max_rand_number_tier1) as usize],
+                winner_users_count: None
             };
             tier1_rounds_store.push(&new_round)?;
         }
@@ -539,6 +551,7 @@ pub fn try_trigger_lucky_number<S: Storage, A: Api, Q: Querier>(
             let mut next_round_pool_size = Uint128(0);
             // Check if any winner, if not the pool size will transfer to the next round so this round state will be 0!
             let win_players_count: u128 = *(updated_round.users_picked_numbers_count.get((lucky_number_tier_2 - 1) as usize)).unwrap() as u128;
+            updated_round.winner_users_count = Some(win_players_count as u32);
             if win_players_count == 0 {
                 next_round_pool_size = updated_round.pool_size;
                 updated_round.pool_size = Uint128(0);
@@ -563,7 +576,8 @@ pub fn try_trigger_lucky_number<S: Storage, A: Api, Q: Querier>(
                 round_end_timestamp: None,
                 round_end_pool_size: None,
                 pool_size: next_round_pool_size,
-                users_picked_numbers_count: vec![0; (max_rand_number_tier2) as usize]
+                users_picked_numbers_count: vec![0; (max_rand_number_tier2) as usize],
+                winner_users_count: None
             };
             tier2_rounds_store.push(&new_round)?;
         }
@@ -595,6 +609,7 @@ pub fn try_trigger_lucky_number<S: Storage, A: Api, Q: Querier>(
             let mut next_round_pool_size = Uint128(0);
             // Check if any winner, if not the pool size will transfer to the next round so this round state will be 0!
             let win_players_count: u128 = *(updated_round.users_picked_numbers_count.get((lucky_number_tier_3 - 1) as usize)).unwrap() as u128;
+            updated_round.winner_users_count = Some(win_players_count as u32);
             if win_players_count == 0 {
                 next_round_pool_size = updated_round.pool_size;
                 updated_round.pool_size = Uint128(0);
@@ -619,7 +634,8 @@ pub fn try_trigger_lucky_number<S: Storage, A: Api, Q: Querier>(
                 round_end_timestamp: None,
                 round_end_pool_size: None,
                 pool_size: next_round_pool_size,
-                users_picked_numbers_count: vec![0; (max_rand_number_tier3) as usize]
+                users_picked_numbers_count: vec![0; (max_rand_number_tier3) as usize],
+                winner_users_count: None
             };
             tier3_rounds_store.push(&new_round)?;
         }

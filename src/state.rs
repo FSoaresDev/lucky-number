@@ -40,7 +40,8 @@ pub struct RoundStruct {
     pub users_count: u32,
     pub round_end_timestamp: Option<u64>,
     pub round_end_pool_size: Option<Uint128>,
-    pub users_picked_numbers_count: Vec<u32>
+    pub users_picked_numbers_count: Vec<u32>,
+    pub winner_users_count: Option<u32>,
 }
   
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
