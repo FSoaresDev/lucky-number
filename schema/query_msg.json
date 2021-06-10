@@ -74,6 +74,33 @@
           }
         }
       }
+    },
+    {
+      "type": "object",
+      "required": [
+        "get_tier_configs"
+      ],
+      "properties": {
+        "get_tier_configs": {
+          "type": "object",
+          "required": [
+            "tier1",
+            "tier2",
+            "tier3"
+          ],
+          "properties": {
+            "tier1": {
+              "type": "boolean"
+            },
+            "tier2": {
+              "type": "boolean"
+            },
+            "tier3": {
+              "type": "boolean"
+            }
+          }
+        }
+      }
     }
   ],
   "definitions": {

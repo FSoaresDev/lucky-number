@@ -7,7 +7,7 @@ use rand_chacha::ChaChaRng;
 use secret_toolkit::{snip20::transfer_msg, storage::{AppendStore, AppendStoreMut, TypedStore}};
 use sha2::{Digest, Sha256};
 use rand_core::SeedableRng;
-use crate::{msg::{CountResponse, HandleAnswer, HandleMsg, InitMsg, QueryAnswer, QueryMsg, ResponseStatus, Snip20Msg}, rand::sha_256, state::{RoundStruct, UserBetStruct, UserBetsStruct, load, may_load, save}, viewing_key::{VIEWING_KEY_SIZE, ViewingKey}};
+use crate::{msg::{CountResponse, HandleAnswer, HandleMsg, InitMsg, QueryAnswer, QueryMsg, ResponseStatus, Snip20Msg, TierConfig}, rand::sha_256, state::{RoundStruct, UserBetStruct, UserBetsStruct, load, may_load, save}, viewing_key::{VIEWING_KEY_SIZE, ViewingKey}};
 
 /*
     5 min Lucky Number =>  1 sSCRT => 1 - 5
@@ -618,6 +618,7 @@ pub fn query<S: Storage, A: Api, Q: Querier>(
         QueryMsg::GetTriggerer {} => to_binary(&query_triggerer(deps)?),
         QueryMsg::GetUserBets { user_address, viewing_key} => to_binary(&query_user_bets(deps, user_address, viewing_key)?),
         QueryMsg::GetRounds {tier1, tier2, tier3, page, page_size} => to_binary(&query_rounds(deps,tier1, tier2, tier3, page, page_size)?),
+        QueryMsg::GetTierConfigs {tier1, tier2, tier3} => to_binary(&query_tier_configs(deps,tier1, tier2, tier3)?),
     }
 }
 
@@ -743,6 +744,69 @@ fn query_rounds<S: Storage, A: Api, Q: Querier>(
         tier1_rounds,
         tier2_rounds,
         tier3_rounds
+    })
+}
+
+fn query_tier_configs<S: Storage, A: Api, Q: Querier>(
+    deps: &Extern<S, A, Q>,
+    tier1: bool,
+    tier2: bool,
+    tier3: bool
+) -> StdResult<Binary> {
+
+    let mut tier1_configs:Option<TierConfig> = None;
+    let mut tier2_configs:Option<TierConfig> = None;
+    let mut tier3_configs:Option<TierConfig> = None;
+
+    if tier1 {
+        let tier_config = ReadonlyPrefixedStorage::new(LUCKY_NUMBER_CONFIG_TIER_1, &deps.storage);
+        let entry_fee: Uint128 = load(&tier_config, b"entry_fee").unwrap();
+        let triggerer_fee: Uint128 = load(&tier_config, b"triggerer_fee").unwrap();
+        let min_entries: i16 = load(&tier_config, b"min_entries").unwrap();
+        let max_rand_number: i16 = load(&tier_config, b"max_rand_number").unwrap();
+
+        tier1_configs = Some(TierConfig {
+            entry_fee,
+            triggerer_fee,
+            min_entries,
+            max_rand_number
+        });
+    }
+
+    if tier2 {
+        let tier_config = ReadonlyPrefixedStorage::new(LUCKY_NUMBER_CONFIG_TIER_2, &deps.storage);
+        let entry_fee: Uint128 = load(&tier_config, b"entry_fee").unwrap();
+        let triggerer_fee: Uint128 = load(&tier_config, b"triggerer_fee").unwrap();
+        let min_entries: i16 = load(&tier_config, b"min_entries").unwrap();
+        let max_rand_number: i16 = load(&tier_config, b"max_rand_number").unwrap();
+
+        tier2_configs = Some(TierConfig {
+            entry_fee,
+            triggerer_fee,
+            min_entries,
+            max_rand_number
+        });
+    }
+
+    if tier3 {
+        let tier_config = ReadonlyPrefixedStorage::new(LUCKY_NUMBER_CONFIG_TIER_3, &deps.storage);
+        let entry_fee: Uint128 = load(&tier_config, b"entry_fee").unwrap();
+        let triggerer_fee: Uint128 = load(&tier_config, b"triggerer_fee").unwrap();
+        let min_entries: i16 = load(&tier_config, b"min_entries").unwrap();
+        let max_rand_number: i16 = load(&tier_config, b"max_rand_number").unwrap();
+
+        tier3_configs = Some(TierConfig {
+            entry_fee,
+            triggerer_fee,
+            min_entries,
+            max_rand_number
+        });
+    }
+    
+    to_binary(&QueryAnswer::GetTierConfigs {
+        tier1_configs,
+        tier2_configs,
+        tier3_configs
     })
 }
 

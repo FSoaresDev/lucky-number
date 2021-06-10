@@ -42,7 +42,8 @@ pub enum QueryMsg {
     // GetCount returns the current count as a json-encoded number
     GetTriggerer {},
     GetUserBets {user_address: HumanAddr, viewing_key: String},
-    GetRounds { tier1: bool, tier2: bool, tier3: bool, page: u32, page_size: u32}
+    GetRounds { tier1: bool, tier2: bool, tier3: bool, page: u32, page_size: u32},
+    GetTierConfigs { tier1: bool, tier2: bool, tier3: bool}
 }
 
 // We define a custom struct for each query response
@@ -95,7 +96,12 @@ pub enum QueryAnswer {
         tier1_rounds: Option<Vec<RoundStruct>>,
         tier2_rounds: Option<Vec<RoundStruct>>,
         tier3_rounds: Option<Vec<RoundStruct>>
-    }
+    },
+    GetTierConfigs { 
+        tier1_configs: Option<TierConfig>,
+        tier2_configs: Option<TierConfig>,
+        tier3_configs: Option<TierConfig>
+    },
 }
 
 #[derive(Serialize, Deserialize, Debug, JsonSchema)]
@@ -116,4 +122,11 @@ pub enum HandleAnswer {
 pub enum ResponseStatus {
     Success,
     Failure,
+}
+#[derive(Serialize, Deserialize, Debug, JsonSchema)]
+pub struct TierConfig {
+    pub entry_fee: Uint128,
+    pub triggerer_fee: Uint128,
+    pub min_entries: i16,
+    pub max_rand_number: i16
 }
