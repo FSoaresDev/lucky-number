@@ -39,10 +39,10 @@
     {
       "type": "object",
       "required": [
-        "get_rounds"
+        "get_paginated_rounds"
       ],
       "properties": {
-        "get_rounds": {
+        "get_paginated_rounds": {
           "type": "object",
           "required": [
             "page",
@@ -70,6 +70,48 @@
             },
             "tier3": {
               "type": "boolean"
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "required": [
+        "get_rounds"
+      ],
+      "properties": {
+        "get_rounds": {
+          "type": "object",
+          "required": [
+            "tier1_rounds",
+            "tier2_rounds",
+            "tier3_rounds"
+          ],
+          "properties": {
+            "tier1_rounds": {
+              "type": "array",
+              "items": {
+                "type": "integer",
+                "format": "uint32",
+                "minimum": 0.0
+              }
+            },
+            "tier2_rounds": {
+              "type": "array",
+              "items": {
+                "type": "integer",
+                "format": "uint32",
+                "minimum": 0.0
+              }
+            },
+            "tier3_rounds": {
+              "type": "array",
+              "items": {
+                "type": "integer",
+                "format": "uint32",
+                "minimum": 0.0
+              }
             }
           }
         }

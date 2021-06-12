@@ -126,4 +126,4 @@ secretcli tx compute execute $contract_address_without_quotes '{"trigger_lucky_n
 
 #secretcli q compute query  secret1s7c6xp9wltthk5r6mmavql4xld5me3g37guhsx '{"balance":{"address": "secret1kw78ltg8380qdrag6puknyk0stdhh4nj68aqj9", "key": "api_key_IwYF2GwgPAawIp7JgJJAJKE7uW/Sj/VVJDodcOSWsZQ="}}'
 
-#secretcli tx compute execute secret1xr89pl6pd9vrlvl9t664a8fk75vhxkpvdsk4rv '{"trigger_lucky_number":{"tier1": true, "tier2": true, "tier3": true, "entropy": 1234}}' --from test1 -y --gas 1500000 -b block
+#secretcli tx compute execute secret17rdq7msq8ywcwks37w9dxdc6tzm6ygmdhgcv5v '{"trigger_lucky_number":{"tier1": true, "tier2": true, "tier3": true, "entropy": 1234}}' --from test1 -y --gas 1500000 -b block

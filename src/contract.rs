@@ -661,7 +661,8 @@ pub fn query<S: Storage, A: Api, Q: Querier>(
     match msg {
         QueryMsg::GetTriggerer {} => to_binary(&query_triggerer(deps)?),
         QueryMsg::GetUserBets { user_address, viewing_key} => to_binary(&query_user_bets(deps, user_address, viewing_key)?),
-        QueryMsg::GetRounds {tier1, tier2, tier3, page, page_size} => to_binary(&query_rounds(deps,tier1, tier2, tier3, page, page_size)?),
+        QueryMsg::GetPaginatedRounds {tier1, tier2, tier3, page, page_size} => to_binary(&query_paginated_rounds(deps,tier1, tier2, tier3, page, page_size)?),
+        QueryMsg::GetRounds {tier1_rounds, tier2_rounds, tier3_rounds} => to_binary(&query_rounds(deps,tier1_rounds, tier2_rounds, tier3_rounds)?),
         QueryMsg::GetTierConfigs {tier1, tier2, tier3} => to_binary(&query_tier_configs(deps,tier1, tier2, tier3)?),
     }
 }
@@ -706,7 +707,7 @@ fn query_user_bets<S: Storage, A: Api, Q: Querier>(deps: &Extern<S, A, Q>, user_
     }
 }
 
-fn query_rounds<S: Storage, A: Api, Q: Querier>(
+fn query_paginated_rounds<S: Storage, A: Api, Q: Querier>(
     deps: &Extern<S, A, Q>,
     tier1: bool,
     tier2: bool,
@@ -723,7 +724,7 @@ fn query_rounds<S: Storage, A: Api, Q: Querier>(
         let tier1_rounds_store = if let Some(result) = AppendStore::<RoundStruct, _>::attach(&tier1_rounds_storage) {
             result?
         } else {
-            return to_binary(&QueryAnswer::GetRounds {
+            return to_binary(&QueryAnswer::GetPaginatedRounds {
                 tier1_rounds,
                 tier2_rounds,
                 tier3_rounds
@@ -750,7 +751,7 @@ fn query_rounds<S: Storage, A: Api, Q: Querier>(
         let tier2_rounds_store = if let Some(result) = AppendStore::<RoundStruct, _>::attach(&tier2_rounds_storage) {
             result?
         } else {
-            return to_binary(&QueryAnswer::GetRounds {
+            return to_binary(&QueryAnswer::GetPaginatedRounds {
                 tier1_rounds,
                 tier2_rounds,
                 tier3_rounds
@@ -777,7 +778,7 @@ fn query_rounds<S: Storage, A: Api, Q: Querier>(
         let tier3_rounds_store = if let Some(result) = AppendStore::<RoundStruct, _>::attach(&tier3_rounds_storage) {
             result?
         } else {
-            return to_binary(&QueryAnswer::GetRounds {
+            return to_binary(&QueryAnswer::GetPaginatedRounds {
                 tier1_rounds,
                 tier2_rounds,
                 tier3_rounds
@@ -799,10 +800,65 @@ fn query_rounds<S: Storage, A: Api, Q: Querier>(
         tier3_rounds = Some(rounds);
     }
     
-    to_binary(&QueryAnswer::GetRounds {
+    to_binary(&QueryAnswer::GetPaginatedRounds {
         tier1_rounds,
         tier2_rounds,
         tier3_rounds
+    })
+}
+
+fn query_rounds <S: Storage, A: Api, Q: Querier>(
+    deps: &Extern<S, A, Q>,
+    tier1_rounds: Vec<u32>,
+    tier2_rounds: Vec<u32>,
+    tier3_rounds: Vec<u32>,
+) -> StdResult<Binary> {
+    let mut rounds : Vec<RoundStruct> = vec![];
+
+    let tier1_rounds_storage = ReadonlyPrefixedStorage::multilevel(&[ROUNDS_STATE, &"tier1".to_string().as_bytes()], &deps.storage);
+    let tier1_rounds_store = if let Some(result) = AppendStore::<RoundStruct, _>::attach(&tier1_rounds_storage) {
+        result?
+    } else {
+        return to_binary(&QueryAnswer::GetRounds {
+            rounds
+        }) 
+    };
+
+    for round_number in tier1_rounds {
+        let round_state: RoundStruct = tier1_rounds_store.get_at(round_number).unwrap();
+        rounds.push(round_state)
+    }
+    
+    let tier2_rounds_storage = ReadonlyPrefixedStorage::multilevel(&[ROUNDS_STATE, &"tier2".to_string().as_bytes()], &deps.storage);
+    let tier2_rounds_store = if let Some(result) = AppendStore::<RoundStruct, _>::attach(&tier2_rounds_storage) {
+        result?
+    } else {
+        return to_binary(&QueryAnswer::GetRounds {
+            rounds
+        }) 
+    };
+
+    for round_number in tier2_rounds {
+        let round_state: RoundStruct = tier2_rounds_store.get_at(round_number).unwrap();
+        rounds.push(round_state)
+    }
+
+    let tier3_rounds_storage = ReadonlyPrefixedStorage::multilevel(&[ROUNDS_STATE, &"tier3".to_string().as_bytes()], &deps.storage);
+    let tier3_rounds_store = if let Some(result) = AppendStore::<RoundStruct, _>::attach(&tier3_rounds_storage) {
+        result?
+    } else {
+        return to_binary(&QueryAnswer::GetRounds {
+            rounds
+        }) 
+    };
+
+    for round_number in tier3_rounds {
+        let round_state: RoundStruct = tier3_rounds_store.get_at(round_number).unwrap();
+        rounds.push(round_state)
+    }
+    
+    to_binary(&QueryAnswer::GetRounds {
+        rounds
     })
 }
 
