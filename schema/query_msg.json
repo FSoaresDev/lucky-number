@@ -22,10 +22,52 @@
         "get_user_bets": {
           "type": "object",
           "required": [
+            "keys",
             "user_address",
             "viewing_key"
           ],
           "properties": {
+            "keys": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "user_address": {
+              "$ref": "#/definitions/HumanAddr"
+            },
+            "viewing_key": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "required": [
+        "get_paginated_user_bets"
+      ],
+      "properties": {
+        "get_paginated_user_bets": {
+          "type": "object",
+          "required": [
+            "page",
+            "page_size",
+            "user_address",
+            "viewing_key"
+          ],
+          "properties": {
+            "page": {
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0.0
+            },
+            "page_size": {
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0.0
+            },
             "user_address": {
               "$ref": "#/definitions/HumanAddr"
             },

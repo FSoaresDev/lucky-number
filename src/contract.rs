@@ -660,7 +660,8 @@ pub fn query<S: Storage, A: Api, Q: Querier>(
 ) -> StdResult<Binary> {
     match msg {
         QueryMsg::GetTriggerer {} => to_binary(&query_triggerer(deps)?),
-        QueryMsg::GetUserBets { user_address, viewing_key} => to_binary(&query_user_bets(deps, user_address, viewing_key)?),
+        QueryMsg::GetUserBets { user_address, viewing_key, keys} => to_binary(&query_user_bets(deps, user_address, viewing_key, keys)?),
+        QueryMsg::GetPaginatedUserBets { user_address, viewing_key, page, page_size} => to_binary(&query_paginated_user_bets(deps, user_address, viewing_key, page, page_size)?),
         QueryMsg::GetPaginatedRounds {tier1, tier2, tier3, page, page_size} => to_binary(&query_paginated_rounds(deps,tier1, tier2, tier3, page, page_size)?),
         QueryMsg::GetRounds {tier1_rounds, tier2_rounds, tier3_rounds} => to_binary(&query_rounds(deps,tier1_rounds, tier2_rounds, tier3_rounds)?),
         QueryMsg::GetTierConfigs {tier1, tier2, tier3} => to_binary(&query_tier_configs(deps,tier1, tier2, tier3)?),
@@ -676,7 +677,9 @@ fn query_triggerer<S: Storage, A: Api, Q: Querier>(deps: &Extern<S, A, Q>) -> Qu
     })
 }
 
-fn query_user_bets<S: Storage, A: Api, Q: Querier>(deps: &Extern<S, A, Q>, user_address: HumanAddr, viewing_key: String) -> QueryResult  {
+fn query_user_bets<S: Storage, A: Api, Q: Querier>(deps: &Extern<S, A, Q>, user_address: HumanAddr, viewing_key: String, keys: Vec<String>) -> QueryResult  {
+    let mut user_bets: Vec<UserBetStruct> = vec![];
+    
     let user_address_canonical = &deps.api.canonical_address(&user_address)?;
 
     if !is_key_valid(&deps.storage, user_address_canonical, viewing_key)? {
@@ -686,26 +689,114 @@ fn query_user_bets<S: Storage, A: Api, Q: Querier>(deps: &Extern<S, A, Q>, user_
     }
 
     let bets_storage = ReadonlyPrefixedStorage::new(BETS, &deps.storage);
-    let user_bets: Option<UserBetsStruct> = load(&bets_storage, &user_address_canonical.as_slice())?;
+    let user_bets_store: Option<UserBetsStruct> = load(&bets_storage, &user_address_canonical.as_slice())?;
 
-    let mut user_bets_vec = vec![];
-
-    if user_bets != None {
-        for key in user_bets.clone().unwrap().bet_keys.iter() {
-            user_bets_vec.push(user_bets.clone().unwrap().bets[key].clone())
-        }
-
-        to_binary(&QueryAnswer::GetUserBets {
-            user_bet_keys: user_bets.unwrap().bet_keys,
-            user_bets: user_bets_vec
+    if user_bets_store == None {
+        return to_binary(&QueryAnswer::GetUserBets {
+            user_bets
         })
     } else {
-        to_binary(&QueryAnswer::GetUserBets {
-            user_bet_keys: vec![],
-            user_bets: user_bets_vec
-        })
+        let user_bets_store_unwrapped = user_bets_store.unwrap();
+        for key in keys {
+            let bet_state = user_bets_store_unwrapped.bets.get(&key);
+            if bet_state != None {
+                user_bets.push(bet_state.unwrap().to_owned());
+            }
+        }
     }
+
+    return to_binary(&QueryAnswer::GetUserBets {
+        user_bets
+    })
 }
+
+fn query_paginated_user_bets<S: Storage, A: Api, Q: Querier>(deps: &Extern<S, A, Q>, 
+    user_address: HumanAddr, 
+    viewing_key: String,
+    page: u32,
+    page_size: u32
+) -> QueryResult  {
+    let mut user_bets : Vec<UserBetStruct> = vec![];
+    let mut bet_rounds: Vec<RoundStruct> = vec![];
+
+    let user_address_canonical = &deps.api.canonical_address(&user_address)?;
+    if !is_key_valid(&deps.storage, user_address_canonical, viewing_key)? {
+        return Err(StdError::generic_err(format!(
+            "User+VK not valid!"
+        )));
+    }
+
+    let tier1_rounds_storage = ReadonlyPrefixedStorage::multilevel(&[ROUNDS_STATE, &"tier1".to_string().as_bytes()], &deps.storage);
+    let tier1_rounds_store = if let Some(result) = AppendStore::<RoundStruct, _>::attach(&tier1_rounds_storage) {
+        result?
+    } else {
+        return to_binary(&QueryAnswer::GetPaginatedUserBets {
+            user_bets,
+            bet_rounds
+        })
+    };
+    let tier2_rounds_storage = ReadonlyPrefixedStorage::multilevel(&[ROUNDS_STATE, &"tier2".to_string().as_bytes()], &deps.storage);
+    let tier2_rounds_store = if let Some(result) = AppendStore::<RoundStruct, _>::attach(&tier2_rounds_storage) {
+        result?
+    } else {
+        return to_binary(&QueryAnswer::GetPaginatedUserBets {
+            user_bets,
+            bet_rounds
+        })
+    };
+    let tier3_rounds_storage = ReadonlyPrefixedStorage::multilevel(&[ROUNDS_STATE, &"tier3".to_string().as_bytes()], &deps.storage);
+    let tier3_rounds_store = if let Some(result) = AppendStore::<RoundStruct, _>::attach(&tier3_rounds_storage) {
+        result?
+    } else {
+        return to_binary(&QueryAnswer::GetPaginatedUserBets {
+            user_bets,
+            bet_rounds
+        })
+    };
+    let bets_storage = ReadonlyPrefixedStorage::new(BETS, &deps.storage);
+    let user_bets_store: Option<UserBetsStruct> = load(&bets_storage, &user_address_canonical.as_slice())?;
+
+    if user_bets_store == None {
+        return to_binary(&QueryAnswer::GetPaginatedUserBets {
+            user_bets,
+            bet_rounds
+        })
+    } else {
+        let user_bets_store_unwrapped = user_bets_store.unwrap();
+        let user_bet_keys_iter = user_bets_store_unwrapped.bet_keys
+        .iter()
+        .rev()
+        .skip((page * page_size) as _)
+        .take(page_size as _);
+
+        let user_bet_keys: Vec<&String> = user_bet_keys_iter.collect();
+        for bet_key in user_bet_keys { 
+            let bet_state: &UserBetStruct = &user_bets_store_unwrapped.bets[bet_key];
+            user_bets.push(bet_state.clone());
+            if bet_state.tier == 1 {
+                let mut round_state = tier1_rounds_store.get_at(bet_state.round_number).unwrap();
+                round_state.users_picked_numbers_count = vec![];
+                bet_rounds.push(round_state)
+            }
+            if bet_state.tier == 2 {
+                let mut round_state = tier2_rounds_store.get_at(bet_state.round_number).unwrap();
+                round_state.users_picked_numbers_count = vec![];
+                bet_rounds.push(round_state)
+            }
+            if bet_state.tier == 3 {
+                let mut round_state = tier3_rounds_store.get_at(bet_state.round_number).unwrap();
+                round_state.users_picked_numbers_count = vec![];
+                bet_rounds.push(round_state)
+            }
+        }
+    }
+  
+    to_binary(&QueryAnswer::GetPaginatedUserBets {
+        user_bets,
+        bet_rounds
+    })
+}
+
 
 fn query_paginated_rounds<S: Storage, A: Api, Q: Querier>(
     deps: &Extern<S, A, Q>,
@@ -825,7 +916,8 @@ fn query_rounds <S: Storage, A: Api, Q: Querier>(
     };
 
     for round_number in tier1_rounds {
-        let round_state: RoundStruct = tier1_rounds_store.get_at(round_number).unwrap();
+        let mut round_state: RoundStruct = tier1_rounds_store.get_at(round_number).unwrap();
+        round_state.users_picked_numbers_count = vec![];
         rounds.push(round_state)
     }
     
@@ -839,7 +931,8 @@ fn query_rounds <S: Storage, A: Api, Q: Querier>(
     };
 
     for round_number in tier2_rounds {
-        let round_state: RoundStruct = tier2_rounds_store.get_at(round_number).unwrap();
+        let mut round_state: RoundStruct = tier2_rounds_store.get_at(round_number).unwrap();
+        round_state.users_picked_numbers_count = vec![];
         rounds.push(round_state)
     }
 
@@ -853,7 +946,8 @@ fn query_rounds <S: Storage, A: Api, Q: Querier>(
     };
 
     for round_number in tier3_rounds {
-        let round_state: RoundStruct = tier3_rounds_store.get_at(round_number).unwrap();
+        let mut round_state: RoundStruct = tier3_rounds_store.get_at(round_number).unwrap();
+        round_state.users_picked_numbers_count = vec![];
         rounds.push(round_state)
     }
     

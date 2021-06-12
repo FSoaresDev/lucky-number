@@ -41,7 +41,8 @@ pub enum HandleMsg {
 pub enum QueryMsg {
     // GetCount returns the current count as a json-encoded number
     GetTriggerer {},
-    GetUserBets {user_address: HumanAddr, viewing_key: String},
+    GetUserBets {user_address: HumanAddr, viewing_key: String, keys: Vec<String>},
+    GetPaginatedUserBets {user_address: HumanAddr, viewing_key: String, page: u32, page_size: u32},
     GetPaginatedRounds { tier1: bool, tier2: bool, tier3: bool, page: u32, page_size: u32},
     GetRounds { tier1_rounds: Vec<u32>, tier2_rounds: Vec<u32>, tier3_rounds: Vec<u32>},
     GetTierConfigs { tier1: bool, tier2: bool, tier3: bool}
@@ -90,8 +91,11 @@ pub enum QueryAnswer {
         triggerer: HumanAddr
     },
     GetUserBets {
-        user_bet_keys: Vec<String>,
         user_bets: Vec<UserBetStruct>
+    },
+    GetPaginatedUserBets {
+        user_bets: Vec<UserBetStruct>,
+        bet_rounds: Vec<RoundStruct>
     },
     GetPaginatedRounds { 
         tier1_rounds: Option<Vec<RoundStruct>>,
