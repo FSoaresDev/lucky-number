@@ -27,7 +27,7 @@ code_hash=$(secretcli query compute list-code | jq '.[-1]."data_hash"')
 echo "Stored contract: '$code_id', '$code_hash'"
 
 label=$(date +"%T")
-    
+: '
 STORE_TX_HASH=$( 
   secretcli tx compute instantiate $code_id " \
   { \
@@ -47,6 +47,30 @@ STORE_TX_HASH=$(
   \"tier3_triggerer_fee\": \"500000\", \
   \"tier3_min_entries\": 5, \
   \"tier3_max_rand_number\": 5 \
+  } \
+  " --from test1 --gas 1500000 --label LuckyNumber_$label -b block -y |
+  jq -r .txhash
+)
+'
+STORE_TX_HASH=$( 
+  secretcli tx compute instantiate $code_id " \
+  { \
+  \"entropy\": 1234,  \
+  \"triggerer_address\": \"secret1kw78ltg8380qdrag6puknyk0stdhh4nj68aqj9\",  \
+  \"token_address\": \"secret1s7c6xp9wltthk5r6mmavql4xld5me3g37guhsx\",  \
+  \"token_hash\": \"CD400FB73F5C99EDBC6AAB22C2593332B8C9F2EA806BF9B42E3A523F3AD06F62\",  \
+  \"tier1_entry_fee\": \"10000000\", \
+  \"tier1_triggerer_fee\": \"5000000\", \
+  \"tier1_min_entries\": 4, \
+  \"tier1_max_rand_number\": 4, \
+  \"tier2_entry_fee\": \"5000000\", \
+  \"tier2_triggerer_fee\": \"2500000\", \
+  \"tier2_min_entries\": 3, \
+  \"tier2_max_rand_number\": 3, \
+  \"tier3_entry_fee\": \"1000000\", \
+  \"tier3_triggerer_fee\": \"500000\", \
+  \"tier3_min_entries\": 2, \
+  \"tier3_max_rand_number\": 2 \
   } \
   " --from test1 --gas 1500000 --label LuckyNumber_$label -b block -y |
   jq -r .txhash
@@ -102,4 +126,4 @@ secretcli tx compute execute $contract_address_without_quotes '{"trigger_lucky_n
 
 #secretcli q compute query  secret1s7c6xp9wltthk5r6mmavql4xld5me3g37guhsx '{"balance":{"address": "secret1kw78ltg8380qdrag6puknyk0stdhh4nj68aqj9", "key": "api_key_IwYF2GwgPAawIp7JgJJAJKE7uW/Sj/VVJDodcOSWsZQ="}}'
 
-#secretcli tx compute execute secret1wfwfmcg5p29kvlhehahp4lsgqf2uyzxu0z2v8n '{"trigger_lucky_number":{"tier1": true, "tier2": true, "tier3": true, "entropy": 1234}}' --from test1 -y --gas 1500000 -b block
+#secretcli tx compute execute secret1xr89pl6pd9vrlvl9t664a8fk75vhxkpvdsk4rv '{"trigger_lucky_number":{"tier1": true, "tier2": true, "tier3": true, "entropy": 1234}}' --from test1 -y --gas 1500000 -b block

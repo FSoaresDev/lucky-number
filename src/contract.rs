@@ -734,10 +734,15 @@ fn query_rounds<S: Storage, A: Api, Q: Querier>(
         .iter()
         .rev()
         .skip((page * page_size) as _)
-        .take(page_size as _);
-
-        let rounds: StdResult<Vec<RoundStruct>> = rounds_iter.collect();
-        tier1_rounds = Some(rounds.unwrap());
+        .take(page_size as _)
+        .map(|x| {
+            let mut modified = x.unwrap();
+            modified.users_picked_numbers_count = vec![];
+            return modified
+        });
+        
+        let rounds: Vec<RoundStruct> = rounds_iter.collect();
+        tier1_rounds = Some(rounds);
     }
 
     if tier2 {
@@ -756,10 +761,15 @@ fn query_rounds<S: Storage, A: Api, Q: Querier>(
         .iter()
         .rev()
         .skip((page * page_size) as _)
-        .take(page_size as _);
+        .take(page_size as _)
+        .map(|x| {
+            let mut modified = x.unwrap();
+            modified.users_picked_numbers_count = vec![];
+            return modified
+        });
 
-        let rounds: StdResult<Vec<RoundStruct>> = rounds_iter.collect();
-        tier2_rounds = Some(rounds.unwrap());
+        let rounds: Vec<RoundStruct> = rounds_iter.collect();
+        tier2_rounds = Some(rounds);
     }
 
     if tier3 {
@@ -778,10 +788,15 @@ fn query_rounds<S: Storage, A: Api, Q: Querier>(
         .iter()
         .rev()
         .skip((page * page_size) as _)
-        .take(page_size as _);
+        .take(page_size as _)
+        .map(|x| {
+            let mut modified = x.unwrap();
+            modified.users_picked_numbers_count = vec![];
+            return modified
+        });
 
-        let rounds: StdResult<Vec<RoundStruct>> = rounds_iter.collect();
-        tier3_rounds = Some(rounds.unwrap());
+        let rounds: Vec<RoundStruct> = rounds_iter.collect();
+        tier3_rounds = Some(rounds);
     }
     
     to_binary(&QueryAnswer::GetRounds {
