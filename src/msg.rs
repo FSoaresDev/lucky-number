@@ -45,7 +45,8 @@ pub enum QueryMsg {
     GetPaginatedUserBets {user_address: HumanAddr, viewing_key: String, page: u32, page_size: u32},
     GetPaginatedRounds { tier1: bool, tier2: bool, tier3: bool, page: u32, page_size: u32},
     GetRounds { tier1_rounds: Vec<u32>, tier2_rounds: Vec<u32>, tier3_rounds: Vec<u32>},
-    GetTierConfigs { tier1: bool, tier2: bool, tier3: bool}
+    GetTierConfigs { tier1: bool, tier2: bool, tier3: bool},
+    CheckTriggers {}
 }
 
 // We define a custom struct for each query response
@@ -111,6 +112,11 @@ pub enum QueryAnswer {
         tier2_configs: Option<TierConfig>,
         tier3_configs: Option<TierConfig>
     },
+    CheckTriggers {
+        tier1_trigger: bool,
+        tier2_trigger: bool,
+        tier3_trigger: bool,
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, JsonSchema)]

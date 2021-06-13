@@ -185,6 +185,17 @@
           }
         }
       }
+    },
+    {
+      "type": "object",
+      "required": [
+        "check_triggers"
+      ],
+      "properties": {
+        "check_triggers": {
+          "type": "object"
+        }
+      }
     }
   ],
   "definitions": {
