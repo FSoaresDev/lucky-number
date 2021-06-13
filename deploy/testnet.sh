@@ -56,7 +56,7 @@ STORE_TX_HASH=$(
   secretcli tx compute instantiate $code_id " \
   { \
   \"entropy\": 1234,  \
-  \"triggerer_address\": \"secret1kw78ltg8380qdrag6puknyk0stdhh4nj68aqj9\",  \
+  \"triggerer_address\": \"secret1v5y7as75cqd0trtq62hgzj7u4ck9slhnrf3k4c\",  \
   \"token_address\": \"secret1s7c6xp9wltthk5r6mmavql4xld5me3g37guhsx\",  \
   \"token_hash\": \"CD400FB73F5C99EDBC6AAB22C2593332B8C9F2EA806BF9B42E3A523F3AD06F62\",  \
   \"tier1_entry_fee\": \"10000000\", \
