@@ -1,5 +1,5 @@
 # Current Testnet address
-secret1ert7m9te0xt6mhgy5z2hpgcrfs3uu420dhulyt
+secret156aue7vlx0lkc2n65x98u8kt6zsm8adpy3jklz
 # TODO
 * Change Tier to Pool names
 * Check Trigger

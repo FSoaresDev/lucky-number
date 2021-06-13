@@ -95,7 +95,8 @@ pub enum QueryAnswer {
     },
     GetPaginatedUserBets {
         user_bets: Vec<UserBetStruct>,
-        bet_rounds: Vec<RoundStruct>
+        bet_rounds: Vec<RoundStruct>,
+        user_bets_total_count: usize
     },
     GetPaginatedRounds { 
         tier1_rounds: Option<Vec<RoundStruct>>,

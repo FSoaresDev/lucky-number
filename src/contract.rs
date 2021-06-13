@@ -718,6 +718,7 @@ fn query_paginated_user_bets<S: Storage, A: Api, Q: Querier>(deps: &Extern<S, A,
 ) -> QueryResult  {
     let mut user_bets : Vec<UserBetStruct> = vec![];
     let mut bet_rounds: Vec<RoundStruct> = vec![];
+    let mut user_bets_total_count = 0;
 
     let user_address_canonical = &deps.api.canonical_address(&user_address)?;
     if !is_key_valid(&deps.storage, user_address_canonical, viewing_key)? {
@@ -732,7 +733,8 @@ fn query_paginated_user_bets<S: Storage, A: Api, Q: Querier>(deps: &Extern<S, A,
     } else {
         return to_binary(&QueryAnswer::GetPaginatedUserBets {
             user_bets,
-            bet_rounds
+            bet_rounds,
+            user_bets_total_count
         })
     };
     let tier2_rounds_storage = ReadonlyPrefixedStorage::multilevel(&[ROUNDS_STATE, &"tier2".to_string().as_bytes()], &deps.storage);
@@ -741,7 +743,8 @@ fn query_paginated_user_bets<S: Storage, A: Api, Q: Querier>(deps: &Extern<S, A,
     } else {
         return to_binary(&QueryAnswer::GetPaginatedUserBets {
             user_bets,
-            bet_rounds
+            bet_rounds,
+            user_bets_total_count
         })
     };
     let tier3_rounds_storage = ReadonlyPrefixedStorage::multilevel(&[ROUNDS_STATE, &"tier3".to_string().as_bytes()], &deps.storage);
@@ -750,7 +753,8 @@ fn query_paginated_user_bets<S: Storage, A: Api, Q: Querier>(deps: &Extern<S, A,
     } else {
         return to_binary(&QueryAnswer::GetPaginatedUserBets {
             user_bets,
-            bet_rounds
+            bet_rounds,
+            user_bets_total_count
         })
     };
     let bets_storage = ReadonlyPrefixedStorage::new(BETS, &deps.storage);
@@ -759,10 +763,12 @@ fn query_paginated_user_bets<S: Storage, A: Api, Q: Querier>(deps: &Extern<S, A,
     if user_bets_store == None {
         return to_binary(&QueryAnswer::GetPaginatedUserBets {
             user_bets,
-            bet_rounds
+            bet_rounds,
+            user_bets_total_count
         })
     } else {
         let user_bets_store_unwrapped = user_bets_store.unwrap();
+        user_bets_total_count = user_bets_store_unwrapped.bet_keys.len();
         let user_bet_keys_iter = user_bets_store_unwrapped.bet_keys
         .iter()
         .rev()
@@ -793,7 +799,8 @@ fn query_paginated_user_bets<S: Storage, A: Api, Q: Querier>(deps: &Extern<S, A,
   
     to_binary(&QueryAnswer::GetPaginatedUserBets {
         user_bets,
-        bet_rounds
+        bet_rounds,
+        user_bets_total_count
     })
 }
 
