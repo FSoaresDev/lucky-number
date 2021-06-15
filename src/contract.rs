@@ -1036,7 +1036,6 @@ fn query_check_triggers<S: Storage, A: Api, Q: Querier>(
 
     let tier1_config = ReadonlyPrefixedStorage::new(LUCKY_NUMBER_CONFIG_TIER_1, &deps.storage);
     let min_entries_tier1: i16 = load(&tier1_config, b"min_entries").unwrap();
-    let entry_fee_tier1: Uint128 = load(&tier1_config, b"entry_fee").unwrap();
     let tier1_rounds = ReadonlyPrefixedStorage::multilevel(&[ROUNDS_STATE, &"tier1".to_string().as_bytes()], &deps.storage);
     let tier1_rounds_store = if let Some(result) = AppendStore::<RoundStruct, _>::attach(&tier1_rounds) {
         result?
@@ -1049,16 +1048,13 @@ fn query_check_triggers<S: Storage, A: Api, Q: Querier>(
     };
         
     let tier1_cur_round: RoundStruct = tier1_rounds_store.get_at(tier1_rounds_store.len() - 1).unwrap();
-    let pool_size_cur_round_tier1: Uint128 =  tier1_cur_round.pool_size;
 
-    // check if there are enougth pool size (pool_size >= min_entries * entry_fee)
-    if pool_size_cur_round_tier1 >= Uint128(min_entries_tier1 as u128).multiply_ratio(entry_fee_tier1, Uint128(1)) {
+    if tier1_cur_round.users_count >= min_entries_tier1 as u32 {
         tier1_trigger = true;
     }
 
     let tier2_config = ReadonlyPrefixedStorage::new(LUCKY_NUMBER_CONFIG_TIER_2, &deps.storage);
     let min_entries_tier2: i16 = load(&tier2_config, b"min_entries").unwrap();
-    let entry_fee_tier2: Uint128 = load(&tier2_config, b"entry_fee").unwrap();
     let tier2_rounds = ReadonlyPrefixedStorage::multilevel(&[ROUNDS_STATE, &"tier2".to_string().as_bytes()], &deps.storage);
     let tier2_rounds_store = if let Some(result) = AppendStore::<RoundStruct, _>::attach(&tier2_rounds) {
         result?
@@ -1071,16 +1067,13 @@ fn query_check_triggers<S: Storage, A: Api, Q: Querier>(
     };
         
     let tier2_cur_round: RoundStruct = tier2_rounds_store.get_at(tier2_rounds_store.len() - 1).unwrap();
-    let pool_size_cur_round_tier2: Uint128 =  tier2_cur_round.pool_size;
 
-    // check if there are enougth pool size (pool_size >= min_entries * entry_fee)
-    if pool_size_cur_round_tier2 >= Uint128(min_entries_tier2 as u128).multiply_ratio(entry_fee_tier2, Uint128(1)) {
+    if tier2_cur_round.users_count >= min_entries_tier2 as u32 {
         tier2_trigger = true;
     }
 
     let tier3_config = ReadonlyPrefixedStorage::new(LUCKY_NUMBER_CONFIG_TIER_3, &deps.storage);
     let min_entries_tier3: i16 = load(&tier3_config, b"min_entries").unwrap();
-    let entry_fee_tier3: Uint128 = load(&tier3_config, b"entry_fee").unwrap();
     let tier3_rounds = ReadonlyPrefixedStorage::multilevel(&[ROUNDS_STATE, &"tier3".to_string().as_bytes()], &deps.storage);
     let tier3_rounds_store = if let Some(result) = AppendStore::<RoundStruct, _>::attach(&tier3_rounds) {
         result?
@@ -1093,10 +1086,9 @@ fn query_check_triggers<S: Storage, A: Api, Q: Querier>(
     };
         
     let tier3_cur_round: RoundStruct = tier3_rounds_store.get_at(tier3_rounds_store.len() - 1).unwrap();
-    let pool_size_cur_round_tier3: Uint128 =  tier3_cur_round.pool_size;
 
     // check if there are enougth pool size (pool_size >= min_entries * entry_fee)
-    if pool_size_cur_round_tier3 >= Uint128(min_entries_tier3 as u128).multiply_ratio(entry_fee_tier3, Uint128(1)) {
+    if tier3_cur_round.users_count >= min_entries_tier3 as u32 {
         tier3_trigger = true;
     }
 
