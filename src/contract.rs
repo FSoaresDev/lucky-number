@@ -482,7 +482,7 @@ pub fn try_trigger_lucky_number<S: Storage, A: Api, Q: Querier>(
 
         // check if there are enougth pool size (pool_size >= min_entries * entry_fee)
         if pool_size_cur_round_tier1 >= Uint128(min_entries_tier1 as u128).multiply_ratio(entry_fee_tier1, Uint128(1)) {
-            lucky_number_tier_1 = rng.gen_range(1,max_rand_number_tier1);
+            lucky_number_tier_1 = rng.gen_range(1,max_rand_number_tier1 + 1);
 
             //update round
             let mut updated_round = tier1_cur_round;
@@ -540,7 +540,7 @@ pub fn try_trigger_lucky_number<S: Storage, A: Api, Q: Querier>(
 
         // check if there are enougth pool size (pool_size >= min_entries * entry_fee)
         if pool_size_cur_round_tier2 >= Uint128(min_entries_tier2 as u128).multiply_ratio(entry_fee_tier2, Uint128(1)) {
-            lucky_number_tier_2 = rng.gen_range(1,max_rand_number_tier2);
+            lucky_number_tier_2 = rng.gen_range(1,max_rand_number_tier2 + 1);
 
             //update round
             let mut updated_round = tier2_cur_round;
@@ -598,7 +598,7 @@ pub fn try_trigger_lucky_number<S: Storage, A: Api, Q: Querier>(
 
         // check if there are enougth pool size (pool_size >= min_entries * entry_fee)
         if pool_size_cur_round_tier3 >= Uint128(min_entries_tier3 as u128).multiply_ratio(entry_fee_tier3, Uint128(1)) {
-            lucky_number_tier_3 = rng.gen_range(1,max_rand_number_tier3);
+            lucky_number_tier_3 = rng.gen_range(1,max_rand_number_tier3 + 1);
 
             //update round
             let mut updated_round = tier3_cur_round;
