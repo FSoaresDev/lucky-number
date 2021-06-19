@@ -115,6 +115,7 @@ pub fn handle<S: Storage, A: Api, Q: Querier>(
         HandleMsg::TriggerLuckyNumber { tier1, tier2, tier3, entropy } => try_trigger_lucky_number(deps, env, tier1, tier2, tier3, entropy),
         
         // Admin
+        HandleMsg::ChangeAdmin { admin } => try_change_admin(deps, env, admin),
         HandleMsg::ChangeTriggerer { triggerer } => try_change_triggerer(deps, env, triggerer),
         HandleMsg::ChangeTier { tier, entry_fee, triggerer_fee, min_entries, max_rand_number } => try_change_tier(deps, env, tier, entry_fee, triggerer_fee, min_entries, max_rand_number),
 
@@ -272,12 +273,43 @@ pub fn try_bet<S: Storage, A: Api, Q: Querier>(
     })
 }
 
+pub fn try_change_admin<S: Storage, A: Api, Q: Querier>(
+    deps: &mut Extern<S, A, Q>,
+    env: Env,
+    admin: HumanAddr,
+) -> StdResult<HandleResponse> {
+    let sender = deps.api.canonical_address(&env.message.sender)?;
+    let mut config_data = PrefixedStorage::new(CONFIG_DATA, &mut deps.storage);
+    let owner_address: CanonicalAddr = load(&config_data, b"owner").unwrap();
+
+    if sender == owner_address {
+        save(&mut config_data, b"owner", &deps.api.canonical_address(&admin)?)?;
+        Ok(HandleResponse::default())
+    } else {
+        return Err(StdError::generic_err(format!(
+            "User does not permissions to change owner!"
+        )));
+    }
+}
+
 pub fn try_change_triggerer<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
     env: Env,
     triggerer: HumanAddr,
 ) -> StdResult<HandleResponse> {
-    Ok(HandleResponse::default())
+    let sender = deps.api.canonical_address(&env.message.sender)?;
+    let mut config_data = PrefixedStorage::new(CONFIG_DATA, &mut deps.storage);
+    let owner_address: CanonicalAddr = load(&config_data, b"owner").unwrap();
+
+    if sender == owner_address {
+        save(&mut config_data, b"triggerer", &triggerer)?;
+        Ok(HandleResponse::default())
+    } else {
+        return Err(StdError::generic_err(format!(
+            "User does not permissions to change triggerer!"
+        )));
+    }
+    
 }
 
 pub fn try_change_tier<S: Storage, A: Api, Q: Querier>(
@@ -289,7 +321,33 @@ pub fn try_change_tier<S: Storage, A: Api, Q: Querier>(
     min_entries: i16, 
     max_rand_number: i16
 ) -> StdResult<HandleResponse> {
-    Ok(HandleResponse::default())
+    let sender = deps.api.canonical_address(&env.message.sender)?;
+    let config_data = ReadonlyPrefixedStorage::new(CONFIG_DATA, &deps.storage);
+    let owner_address: CanonicalAddr = load(&config_data, b"owner").unwrap();
+
+    if sender == owner_address {
+        let tier_config_key = 
+            if tier == 1 { LUCKY_NUMBER_CONFIG_TIER_1 } 
+            else if tier == 2 { LUCKY_NUMBER_CONFIG_TIER_2 } 
+            else if tier == 3 { LUCKY_NUMBER_CONFIG_TIER_3 } 
+            else { 
+                        return Err(StdError::generic_err(format!(
+                            "Tier invalid"
+                        )));
+            };
+            
+        let mut tier_state = PrefixedStorage::new(tier_config_key, &mut deps.storage);
+        save(&mut tier_state, b"entry_fee", &entry_fee)?;
+        save(&mut tier_state, b"triggerer_fee", &triggerer_fee)?;
+        save(&mut tier_state, b"min_entries", &min_entries)?;
+        save(&mut tier_state, b"max_rand_number", &max_rand_number)?;
+
+        Ok(HandleResponse::default())
+    } else {
+        return Err(StdError::generic_err(format!(
+            "User does not permissions to change tiers!"
+        )));
+    }
 }
 
 pub fn try_withdrawl<S: Storage, A: Api, Q: Querier>(

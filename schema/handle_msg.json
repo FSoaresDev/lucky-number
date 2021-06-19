@@ -112,6 +112,25 @@
     {
       "type": "object",
       "required": [
+        "change_admin"
+      ],
+      "properties": {
+        "change_admin": {
+          "type": "object",
+          "required": [
+            "admin"
+          ],
+          "properties": {
+            "admin": {
+              "$ref": "#/definitions/HumanAddr"
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "required": [
         "change_triggerer"
       ],
       "properties": {

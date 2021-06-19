@@ -31,6 +31,7 @@ pub enum HandleMsg {
     Bet {tier: i8, number: i16},
     CreateViewingKey {entropy: String },
     Withdrawl {tier: i8, round: u32 },
+    ChangeAdmin {admin: HumanAddr},
     ChangeTriggerer { triggerer: HumanAddr},
     ChangeTier { tier: i8, entry_fee: Uint128, triggerer_fee: Uint128, min_entries: i16, max_rand_number: i16 },
     TriggerLuckyNumber {tier1: bool, tier2: bool, tier3: bool, entropy: u64}

@@ -130,6 +130,8 @@ secretcli tx compute execute $contract_address_without_quotes '{"trigger_lucky_n
 
 secretcli q compute query secret10jzqsnqm88nlxzvpq3c8feg7yaft7a73np8t5v '{"check_triggers":{}}' | base64 --decode --ignore-garbage
 
-
 #secretcli tx compute execute secret1s7c6xp9wltthk5r6mmavql4xld5me3g37guhsx '{"redeem":{"amount": "1000000"}}' --from test1 -y --gas 1500000 -b block
 
+#secretcli tx compute execute secret1jhcvug7afjyqfuf465p7vf900rvl838nwnc04u '{"change_triggerer":{"triggerer": "secret1kw78ltg8380qdrag6puknyk0stdhh4nj68aqj9"}}' --from test1 -y --gas 1500000 -b block
+#secretcli tx compute execute secret1jhcvug7afjyqfuf465p7vf900rvl838nwnc04u '{"change_admin":{"admin": "secret1kw78ltg8380qdrag6puknyk0stdhh4nj68aqj9"}}' --from test1 -y --gas 1500000 -b block
+#secretcli tx compute execute secret1jhcvug7afjyqfuf465p7vf900rvl838nwnc04u '{"change_tier":{"tier": 1,"entry_fee": "30000000", "triggerer_fee": "15000000", "min_entries": 30, "max_rand_number": 30}}' --from test1 -y --gas 1500000 -b block
