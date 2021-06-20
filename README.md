@@ -1,6 +1,6 @@
 # Current Testnet address
-sSCRT: secret1mu7fsh6wclr5tvr8p894qqa9q7jj9an4l6fuk4
-SEFI: secret1ejpcrzl44gl3vvujys467ym3kvkr7f2vpgryqt
+sSCRT: secret1cmk6m6mvxtc8zjaqakrsvta0qdxcsx6xpktume
+SEFI: secret1u507qhw0czym72s6lp62y083xkasm2vcrdq3kw
 # TODO
 * Change Tier to Pool names
 * v2

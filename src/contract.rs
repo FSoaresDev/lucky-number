@@ -162,7 +162,15 @@ pub fn try_receive<S: Storage, A: Api, Q: Querier>(
         }
 
         if let HandleMsg::Bet {tier,number} = msg.clone() {
-            return try_bet(deps, env.clone(), amount, from, number, tier)
+            let config_data = ReadonlyPrefixedStorage::new(CONFIG_DATA, &mut deps.storage);
+            let token_address: HumanAddr = load(&config_data, b"token_address").unwrap();
+            if env.message.sender != token_address {
+                return Err(StdError::generic_err(format!(
+                    "Invalid token sent!"
+                )));
+            } else {
+                return try_bet(deps, env.clone(), amount, from, number, tier)
+            }
         } else {
             return Err(StdError::generic_err(format!(
                 "Receive handler not found!"

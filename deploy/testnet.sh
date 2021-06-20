@@ -135,4 +135,4 @@ sleep 5
 
 #secretcli tx compute execute secret1jhcvug7afjyqfuf465p7vf900rvl838nwnc04u '{"change_triggerer":{"triggerer": "secret1kw78ltg8380qdrag6puknyk0stdhh4nj68aqj9"}}' --from test1 -y --gas 1500000 -b block
 #secretcli tx compute execute secret1jhcvug7afjyqfuf465p7vf900rvl838nwnc04u '{"change_admin":{"admin": "secret1kw78ltg8380qdrag6puknyk0stdhh4nj68aqj9"}}' --from test1 -y --gas 1500000 -b block
-#secretcli tx compute execute secret1jhcvug7afjyqfuf465p7vf900rvl838nwnc04u '{"change_tier":{"tier": 1,"entry_fee": "30000000", "triggerer_fee": "15000000", "min_entries": 30, "max_rand_number": 30}}' --from test1 -y --gas 1500000 -b block
+#secretcli tx compute execute secret16d05wj83d63pgdl2tg2qmyymmpx9chs3m4pq67 '{"change_tier":{"tier": 3,"entry_fee": "100000", "triggerer_fee": "50000", "min_entries": 2, "max_rand_number": 5}}' --from test1 -y --gas 1500000 -b block
