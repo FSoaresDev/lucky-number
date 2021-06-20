@@ -27,12 +27,12 @@ code_hash=$(secretcli query compute list-code | jq '.[-1]."data_hash"')
 echo "Stored contract: '$code_id', '$code_hash'"
 
 label=$(date +"%T")
-: '
+
 STORE_TX_HASH=$( 
   secretcli tx compute instantiate $code_id " \
   { \
-  \"entropy\": 1234,  \
-  \"triggerer_address\": \"secret1kw78ltg8380qdrag6puknyk0stdhh4nj68aqj9\",  \
+  \"entropy\": 12419445078009011071,  \
+  \"triggerer_address\": \"secret1v5y7as75cqd0trtq62hgzj7u4ck9slhnrf3k4c\",  \
   \"token_address\": \"secret1s7c6xp9wltthk5r6mmavql4xld5me3g37guhsx\",  \
   \"token_hash\": \"CD400FB73F5C99EDBC6AAB22C2593332B8C9F2EA806BF9B42E3A523F3AD06F62\",  \
   \"tier1_entry_fee\": \"10000000\", \
@@ -51,7 +51,7 @@ STORE_TX_HASH=$(
   " --from test1 --gas 1500000 --label LuckyNumber_$label -b block -y |
   jq -r .txhash
 )
-'
+: '
 STORE_TX_HASH=$( 
   secretcli tx compute instantiate $code_id " \
   { \
@@ -75,6 +75,7 @@ STORE_TX_HASH=$(
   " --from test1 --gas 1500000 --label LuckyNumber_$label -b block -y |
   jq -r .txhash
 )
+'
 wait_for_tx "$STORE_TX_HASH" "Waiting for instantiate to finish on-chain..."
 
 contract_address=$(secretcli query compute list-contract-by-code $code_id | jq '.[-1].address')
@@ -104,7 +105,7 @@ sleep 5
 #secretcli q compute query $contract_address_without_quotes '{"get_rounds": {"tier1": true, "tier2": true, "tier3": true, "page_size": 10, "page": 0 }}' | base64 --decode --ignore-garbage
 
 # trigger
-secretcli tx compute execute $contract_address_without_quotes '{"trigger_lucky_number":{"tier1": true, "tier2": true, "tier3": true, "entropy": 1234}}' --from test1 -y --gas 1500000 -b block
+#secretcli tx compute execute $contract_address_without_quotes '{"trigger_lucky_number":{"tier1": true, "tier2": true, "tier3": true, "entropy": 1234}}' --from test1 -y --gas 1500000 -b block
 
 # create VK
 #secretcli tx compute execute $contract_address_without_quotes '{"create_viewing_key":{"entropy": "1231231"}}' --from test2 -y --gas 1500000 -b block
