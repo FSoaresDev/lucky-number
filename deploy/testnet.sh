@@ -129,7 +129,7 @@ sleep 5
 
 #secretcli tx compute execute secret10jzqsnqm88nlxzvpq3c8feg7yaft7a73np8t5v '{"trigger_lucky_number":{"tier1": true, "tier2": true, "tier3": true, "entropy": 1234}}' --from test1 -y --gas 1500000 -b block
 
-secretcli q compute query secret10jzqsnqm88nlxzvpq3c8feg7yaft7a73np8t5v '{"check_triggers":{}}' | base64 --decode --ignore-garbage
+#secretcli q compute query secret10jzqsnqm88nlxzvpq3c8feg7yaft7a73np8t5v '{"check_triggers":{}}' | base64 --decode --ignore-garbage
 
 #secretcli tx compute execute secret1s7c6xp9wltthk5r6mmavql4xld5me3g37guhsx '{"redeem":{"amount": "1000000"}}' --from test1 -y --gas 1500000 -b block
 
