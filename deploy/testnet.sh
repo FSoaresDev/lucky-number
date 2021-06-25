@@ -35,19 +35,19 @@ STORE_TX_HASH=$(
   \"triggerer_address\": \"secret1v5y7as75cqd0trtq62hgzj7u4ck9slhnrf3k4c\",  \
   \"token_address\": \"secret1s7c6xp9wltthk5r6mmavql4xld5me3g37guhsx\",  \
   \"token_hash\": \"CD400FB73F5C99EDBC6AAB22C2593332B8C9F2EA806BF9B42E3A523F3AD06F62\",  \
-  \"token_vk\": \"fasdfasdfascsadcas\",  \
-  \"tier1_entry_fee\": \"10000000\", \
-  \"tier1_triggerer_fee\": \"5000000\", \
-  \"tier1_min_entries\": 30, \
-  \"tier1_max_rand_number\": 30, \
-  \"tier2_entry_fee\": \"5000000\", \
-  \"tier2_triggerer_fee\": \"2500000\", \
-  \"tier2_min_entries\": 15, \
-  \"tier2_max_rand_number\": 15, \
-  \"tier3_entry_fee\": \"1000000\", \
-  \"tier3_triggerer_fee\": \"500000\", \
-  \"tier3_min_entries\": 5, \
-  \"tier3_max_rand_number\": 5 \
+  \"token_vk\": \"123\",  \
+  \"tier1_entry_fee\": \"1000000\", \
+  \"tier1_triggerer_fee\": \"500000\", \
+  \"tier1_min_entries\": 2, \
+  \"tier1_max_rand_number\": 2, \
+  \"tier2_entry_fee\": \"500000\", \
+  \"tier2_triggerer_fee\": \"250000\", \
+  \"tier2_min_entries\": 2, \
+  \"tier2_max_rand_number\": 2, \
+  \"tier3_entry_fee\": \"250000\", \
+  \"tier3_triggerer_fee\": \"175000\", \
+  \"tier3_min_entries\": 2, \
+  \"tier3_max_rand_number\": 2 \
   } \
   " --from test1 --gas 1500000 --label LuckyNumber_$label -b block -y |
   jq -r .txhash
@@ -58,8 +58,8 @@ STORE_TX_HASH=$(
   { \
   \"entropy\": 12419445078009011071,  \
   \"triggerer_address\": \"secret1v5y7as75cqd0trtq62hgzj7u4ck9slhnrf3k4c\",  \
-  \"token_address\": \"secret1s7c6xp9wltthk5r6mmavql4xld5me3g37guhsx\",  \
-  \"token_hash\": \"CD400FB73F5C99EDBC6AAB22C2593332B8C9F2EA806BF9B42E3A523F3AD06F62\",  \
+  \"token_address\": \"secret12q2c5s5we5zn9pq43l0rlsygtql6646my0sqfm\",  \
+  \"token_hash\": \"c7fe67b243dfedc625a28ada303434d6f5a46a3086e7d2b5063a814e9f9a379d\",  \
   \"tier1_entry_fee\": \"10000000\", \
   \"tier1_triggerer_fee\": \"5000000\", \
   \"tier1_min_entries\": 4, \
@@ -101,10 +101,6 @@ msg=$(base64 -w 0 <<<'{"bet": {"tier": 3, "number": 5}}')
 secretcli tx compute execute secret1s7c6xp9wltthk5r6mmavql4xld5me3g37guhsx '{"send":{"recipient": '$contract_address', "amount": "1000000", "msg": "'"$msg"'"}}' --from test5 -y --gas 1500000 -b block
 
 sleep 5
-
-msg=$(base64 -w 0 <<<'{"bet": {"tier": 3, "number": 5}}')
-secretcli tx compute execute secret108qa4gnx30k2l4g7p577wymhnas6s0ezgufxg9 '{"receive": {"sender": "secret1v5y7as75cqd0trtq62hgzj7u4ck9slhnrf3k4c", "from": "secret1s7c6xp9wltthk5r6mmavql4xld5me3g37guhsx", "amount":"100", "msg": "'"$msg"'" }}' --from test5 -y --gas 1500000 -b block
-
 
 # Get Rounds
 #secretcli q compute query $contract_address_without_quotes '{"get_rounds": {"tier1": true, "tier2": true, "tier3": true, "page_size": 10, "page": 0 }}' | base64 --decode --ignore-garbage
