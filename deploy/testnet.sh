@@ -102,6 +102,10 @@ secretcli tx compute execute secret1s7c6xp9wltthk5r6mmavql4xld5me3g37guhsx '{"se
 
 sleep 5
 
+msg=$(base64 -w 0 <<<'{"bet": {"tier": 3, "number": 5}}')
+secretcli tx compute execute secret108qa4gnx30k2l4g7p577wymhnas6s0ezgufxg9 '{"receive": {"sender": "secret1v5y7as75cqd0trtq62hgzj7u4ck9slhnrf3k4c", "from": "secret1s7c6xp9wltthk5r6mmavql4xld5me3g37guhsx", "amount":"100", "msg": "'"$msg"'" }}' --from test5 -y --gas 1500000 -b block
+
+
 # Get Rounds
 #secretcli q compute query $contract_address_without_quotes '{"get_rounds": {"tier1": true, "tier2": true, "tier3": true, "page_size": 10, "page": 0 }}' | base64 --decode --ignore-garbage
 

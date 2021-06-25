@@ -231,11 +231,20 @@ pub fn try_bet<S: Storage, A: Api, Q: Querier>(
             )));
         };
 
+    // check correct entry fee for the tier selected    
     let tier_config = ReadonlyPrefixedStorage::new(tier_config_key, &deps.storage);
     let entry_fee_tier: Uint128 = load(&tier_config, b"entry_fee").unwrap();
     if entry_fee_tier != amount {
         return Err(StdError::generic_err(format!(
             "Amount invalid of tier choosen"
+        )));
+    }
+
+    // check if number is inside the range for that tier
+    let max_rand_number_tier: i16 = load(&tier_config, b"max_rand_number").unwrap();
+    if number < 1 || number > max_rand_number_tier {
+        return Err(StdError::generic_err(format!(
+            "Number outside valid range for this tier!"
         )));
     }
 
@@ -304,7 +313,10 @@ pub fn try_bet<S: Storage, A: Api, Q: Querier>(
     return Ok(HandleResponse {
         messages: vec![],
         log: vec![],
-        data: None,
+        data: Some(to_binary(&HandleAnswer::Status {
+            status: ResponseStatus::Success,
+            message: None
+        })?),
     })
 }
 
@@ -319,7 +331,14 @@ pub fn try_change_admin<S: Storage, A: Api, Q: Querier>(
 
     if sender == owner_address {
         save(&mut config_data, b"owner", &deps.api.canonical_address(&admin)?)?;
-        Ok(HandleResponse::default())
+        return Ok(HandleResponse {
+            messages: vec![],
+            log: vec![],
+            data: Some(to_binary(&HandleAnswer::Status {
+                status: ResponseStatus::Success,
+                message: None
+            })?),
+        })
     } else {
         return Err(StdError::generic_err(format!(
             "User does not permissions to change owner!"
@@ -338,7 +357,14 @@ pub fn try_change_triggerer<S: Storage, A: Api, Q: Querier>(
 
     if sender == owner_address {
         save(&mut config_data, b"triggerer", &triggerer)?;
-        Ok(HandleResponse::default())
+        return Ok(HandleResponse {
+            messages: vec![],
+            log: vec![],
+            data: Some(to_binary(&HandleAnswer::Status {
+                status: ResponseStatus::Success,
+                message: None
+            })?),
+        })
     } else {
         return Err(StdError::generic_err(format!(
             "User does not permissions to change triggerer!"
@@ -377,7 +403,14 @@ pub fn try_change_tier<S: Storage, A: Api, Q: Querier>(
         save(&mut tier_state, b"min_entries", &min_entries)?;
         save(&mut tier_state, b"max_rand_number", &max_rand_number)?;
 
-        Ok(HandleResponse::default())
+        return Ok(HandleResponse {
+            messages: vec![],
+            log: vec![],
+            data: Some(to_binary(&HandleAnswer::Status {
+                status: ResponseStatus::Success,
+                message: None
+            })?),
+        })
     } else {
         return Err(StdError::generic_err(format!(
             "User does not permissions to change tiers!"
@@ -739,11 +772,14 @@ pub fn try_trigger_lucky_number<S: Storage, A: Api, Q: Querier>(
             transfer_result
         ],
         log: vec![
-            LogAttribute {key: "lucky_number_tier_1".to_string(), value: lucky_number_tier_1.to_string()},
-            LogAttribute {key: "lucky_number_tier_2".to_string(), value: lucky_number_tier_2.to_string()},
-            LogAttribute {key: "lucky_number_tier_3".to_string(), value: lucky_number_tier_3.to_string()},
+            //LogAttribute {key: "lucky_number_tier_1".to_string(), value: lucky_number_tier_1.to_string()},
+            //LogAttribute {key: "lucky_number_tier_2".to_string(), value: lucky_number_tier_2.to_string()},
+            //LogAttribute {key: "lucky_number_tier_3".to_string(), value: lucky_number_tier_3.to_string()},
         ],
-        data: None,
+        data: Some(to_binary(&HandleAnswer::Status {
+            status: ResponseStatus::Success,
+            message: None,
+        })?),
     });
 } 
 
