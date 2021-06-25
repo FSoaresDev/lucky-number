@@ -35,6 +35,7 @@ STORE_TX_HASH=$(
   \"triggerer_address\": \"secret1v5y7as75cqd0trtq62hgzj7u4ck9slhnrf3k4c\",  \
   \"token_address\": \"secret1s7c6xp9wltthk5r6mmavql4xld5me3g37guhsx\",  \
   \"token_hash\": \"CD400FB73F5C99EDBC6AAB22C2593332B8C9F2EA806BF9B42E3A523F3AD06F62\",  \
+  \"token_vk\": \"fasdfasdfascsadcas\",  \
   \"tier1_entry_fee\": \"10000000\", \
   \"tier1_triggerer_fee\": \"5000000\", \
   \"tier1_min_entries\": 30, \

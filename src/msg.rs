@@ -10,6 +10,7 @@ pub struct InitMsg {
     pub triggerer_address: HumanAddr,
     pub token_address: HumanAddr,
     pub token_hash: String,
+    pub token_vk: String,
     pub tier1_entry_fee: Uint128,
     pub tier1_triggerer_fee: Uint128,
     pub tier1_min_entries: i16,
@@ -29,7 +30,14 @@ pub struct InitMsg {
 pub enum HandleMsg {
     Receive { sender: HumanAddr, from: HumanAddr, amount: Uint128, msg: Option<Binary> },
     Bet {tier: i8, number: i16},
-    CreateViewingKey {entropy: String },
+    CreateViewingKey {
+        entropy: String,
+        padding: Option<String>,
+    },
+    SetViewingKey {
+        key: String,
+        padding: Option<String>,
+    },
     Withdrawl {tier: i8, round: u32 },
     ChangeAdmin {admin: HumanAddr},
     ChangeTriggerer { triggerer: HumanAddr},

@@ -4,7 +4,7 @@ use cosmwasm_std::{Api, Binary, CanonicalAddr, CosmosMsg, Empty, Env, Extern, Ha
 use cosmwasm_storage::{PrefixedStorage, ReadonlyPrefixedStorage};
 use rand::Rng;
 use rand_chacha::ChaChaRng;
-use secret_toolkit::{snip20::transfer_msg, storage::{AppendStore, AppendStoreMut, TypedStore}};
+use secret_toolkit::{snip20::{self, transfer_msg}, storage::{AppendStore, AppendStoreMut, TypedStore}};
 use sha2::{Digest, Sha256};
 use rand_core::SeedableRng;
 use crate::{msg::{CountResponse, HandleAnswer, HandleMsg, InitMsg, QueryAnswer, QueryMsg, ResponseStatus, Snip20Msg, TierConfig}, rand::sha_256, state::{RoundStruct, UserBetStruct, UserBetsStruct, load, may_load, save}, viewing_key::{VIEWING_KEY_SIZE, ViewingKey}};
@@ -81,19 +81,24 @@ pub fn init<S: Storage, A: Api, Q: Querier>(
     new_round.users_picked_numbers_count = vec![0; *(&msg.tier3_max_rand_number) as usize];
     tier3_rounds_store.push(&new_round)?;
 
-   let snip20_register_msg = to_binary(&Snip20Msg::register_receive(env.clone().contract_code_hash))?;
-
-    let token_response: Option<CosmosMsg> = Some(CosmosMsg::Wasm(WasmMsg::Execute {
-        contract_addr: msg.token_address,
-        callback_code_hash: msg.token_hash,
-        msg: snip20_register_msg,
-        send: vec![],
-    }));
-
     Ok(InitResponse {
         messages: vec![
-           token_response.unwrap()
+           snip20::register_receive_msg(
+            env.contract_code_hash.clone(),
+            None,
+            1,
+            msg.token_hash.clone(),
+            msg.token_address.clone(),
+        )?,
+        snip20::set_viewing_key_msg(
+            msg.token_vk.clone(),
+            None,
+            BLOCK_SIZE, // This is private data, need to pad
+            msg.token_hash.clone(),
+            msg.token_address.clone(),
+        )?,
         ],
+        
         log: vec![],
     })
 }
@@ -105,7 +110,8 @@ pub fn handle<S: Storage, A: Api, Q: Querier>(
 ) -> StdResult<HandleResponse> {
     match msg {
         // Users
-        HandleMsg::CreateViewingKey { entropy } => try_create_key(deps, env, &entropy),
+        HandleMsg::CreateViewingKey { entropy, .. } => try_create_key(deps, env, &entropy),
+        HandleMsg::SetViewingKey { key, .. } => try_set_key(deps, env, &key),
 
         // Bet
         HandleMsg::Receive { sender, from, amount, msg } => try_receive(deps, env, sender, from, amount, msg),
@@ -141,6 +147,27 @@ fn try_create_key<S: Storage, A: Api, Q: Querier>(
         log: vec![],
         data: Some(to_binary(&HandleAnswer::ViewingKey {
             key: format!("{}", key),
+        })?),
+    })
+}
+
+fn try_set_key<S: Storage, A: Api, Q: Querier>(
+    deps: &mut Extern<S, A, Q>,
+    env: Env,
+    key: &String,
+) -> HandleResult {
+    let vk = ViewingKey(key.clone());
+    let message_sender = &deps.api.canonical_address(&env.message.sender)?;
+
+    let mut key_store = PrefixedStorage::new(PREFIX_VIEW_KEY, &mut deps.storage);
+    save(&mut key_store, message_sender.as_slice(), &vk.to_hashed())?;
+
+    Ok(HandleResponse {
+        messages: vec![],
+        log: vec![],
+        data: Some(to_binary(&HandleAnswer::Status {
+            status: ResponseStatus::Success,
+            message: None
         })?),
     })
 }

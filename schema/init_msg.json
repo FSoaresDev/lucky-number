@@ -18,6 +18,7 @@
     "tier3_triggerer_fee",
     "token_address",
     "token_hash",
+    "token_vk",
     "triggerer_address"
   ],
   "properties": {
@@ -72,6 +73,9 @@
       "$ref": "#/definitions/HumanAddr"
     },
     "token_hash": {
+      "type": "string"
+    },
+    "token_vk": {
       "type": "string"
     },
     "triggerer_address": {
