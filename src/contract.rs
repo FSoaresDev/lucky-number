@@ -136,7 +136,7 @@ fn try_create_key<S: Storage, A: Api, Q: Querier>(
 ) -> HandleResult {
     // create and store the key
     let config_data = ReadonlyPrefixedStorage::new(CONFIG_DATA, &deps.storage);
-    let entropy_base: Vec<u8> = load(&config_data, b"entropy").unwrap();
+    let entropy_base: Vec<u8> = load(&config_data, b"entropy")?;
     let key = ViewingKey::new(&env, &entropy_base, entropy.as_ref());
     let message_sender = &deps.api.canonical_address(&env.message.sender)?;
     let mut key_store = PrefixedStorage::new(PREFIX_VIEW_KEY, &mut deps.storage);
@@ -178,19 +178,13 @@ pub fn try_receive<S: Storage, A: Api, Q: Querier>(
     _sender: HumanAddr,
     from: HumanAddr,
     amount: Uint128,
-    msg: Option<Binary>,
+    msg: Binary,
 ) -> StdResult<HandleResponse> {
-    if msg != None { 
-        let msg: HandleMsg = from_binary(&msg.unwrap())?; 
-        if matches!(msg, HandleMsg::Receive { .. }) {
-            return Err(StdError::generic_err(
-                "Recursive call to receive() is not allowed",
-            ));
-        }
+        let msg: HandleMsg = from_binary(&msg)?; 
 
         if let HandleMsg::Bet {tier,number} = msg.clone() {
             let config_data = ReadonlyPrefixedStorage::new(CONFIG_DATA, &mut deps.storage);
-            let token_address: HumanAddr = load(&config_data, b"token_address").unwrap();
+            let token_address: HumanAddr = load(&config_data, b"token_address")?;
             if env.message.sender != token_address {
                 return Err(StdError::generic_err(format!(
                     "Invalid token sent!"
@@ -203,11 +197,6 @@ pub fn try_receive<S: Storage, A: Api, Q: Querier>(
                 "Receive handler not found!"
             )));
          }
-    } else {
-        return Err(StdError::generic_err(format!(
-            "Receive handler not found!"
-        )));
-    }
 }
 
 pub fn try_bet<S: Storage, A: Api, Q: Querier>(
@@ -233,7 +222,7 @@ pub fn try_bet<S: Storage, A: Api, Q: Querier>(
 
     // check correct entry fee for the tier selected    
     let tier_config = ReadonlyPrefixedStorage::new(tier_config_key, &deps.storage);
-    let entry_fee_tier: Uint128 = load(&tier_config, b"entry_fee").unwrap();
+    let entry_fee_tier: Uint128 = load(&tier_config, b"entry_fee")?;
     if entry_fee_tier != amount {
         return Err(StdError::generic_err(format!(
             "Amount invalid of tier choosen"
@@ -241,7 +230,7 @@ pub fn try_bet<S: Storage, A: Api, Q: Querier>(
     }
 
     // check if number is inside the range for that tier
-    let max_rand_number_tier: i16 = load(&tier_config, b"max_rand_number").unwrap();
+    let max_rand_number_tier: i16 = load(&tier_config, b"max_rand_number")?;
     if number < 1 || number > max_rand_number_tier {
         return Err(StdError::generic_err(format!(
             "Number outside valid range for this tier!"
@@ -301,7 +290,7 @@ pub fn try_bet<S: Storage, A: Api, Q: Querier>(
     // add the bet number to the additional entropy array
     // As on ChaChaRng only up to 8 words are used, and 2 of them are the base entropy and the entropy sent by the trigger we will save only 6 users entropy on this array
     let mut config_data = PrefixedStorage::new(CONFIG_DATA, &mut deps.storage);
-    let mut addition_entropy: Vec<_> = load(&config_data, b"addition_entropy").unwrap();
+    let mut addition_entropy: Vec<_> = load(&config_data, b"addition_entropy")?;
     if addition_entropy.len() >= 6 {
         addition_entropy[0] = number as u64;
         addition_entropy.rotate_right(1);
@@ -327,7 +316,7 @@ pub fn try_change_admin<S: Storage, A: Api, Q: Querier>(
 ) -> StdResult<HandleResponse> {
     let sender = deps.api.canonical_address(&env.message.sender)?;
     let mut config_data = PrefixedStorage::new(CONFIG_DATA, &mut deps.storage);
-    let owner_address: CanonicalAddr = load(&config_data, b"owner").unwrap();
+    let owner_address: CanonicalAddr = load(&config_data, b"owner")?;
 
     if sender == owner_address {
         save(&mut config_data, b"owner", &deps.api.canonical_address(&admin)?)?;
@@ -353,7 +342,7 @@ pub fn try_change_triggerer<S: Storage, A: Api, Q: Querier>(
 ) -> StdResult<HandleResponse> {
     let sender = deps.api.canonical_address(&env.message.sender)?;
     let mut config_data = PrefixedStorage::new(CONFIG_DATA, &mut deps.storage);
-    let owner_address: CanonicalAddr = load(&config_data, b"owner").unwrap();
+    let owner_address: CanonicalAddr = load(&config_data, b"owner")?;
 
     if sender == owner_address {
         save(&mut config_data, b"triggerer", &triggerer)?;
@@ -384,7 +373,7 @@ pub fn try_change_tier<S: Storage, A: Api, Q: Querier>(
 ) -> StdResult<HandleResponse> {
     let sender = deps.api.canonical_address(&env.message.sender)?;
     let config_data = ReadonlyPrefixedStorage::new(CONFIG_DATA, &deps.storage);
-    let owner_address: CanonicalAddr = load(&config_data, b"owner").unwrap();
+    let owner_address: CanonicalAddr = load(&config_data, b"owner")?;
 
     if sender == owner_address {
         let tier_config_key = 
@@ -438,12 +427,12 @@ pub fn try_withdrawl<S: Storage, A: Api, Q: Querier>(
         };
 
     let tier_config = ReadonlyPrefixedStorage::new(tier_config_key, &deps.storage);
-    let entry_fee_tier: Uint128 = load(&tier_config, b"entry_fee").unwrap();
+    let entry_fee_tier: Uint128 = load(&tier_config, b"entry_fee")?;
 
     //get transfer token info
     let config_data = ReadonlyPrefixedStorage::new(CONFIG_DATA, &deps.storage);
-    let token_address: HumanAddr = load(&config_data, b"token_address").unwrap();
-    let token_hash: String  = load(&config_data, b"token_hash").unwrap();
+    let token_address: HumanAddr = load(&config_data, b"token_address")?;
+    let token_hash: String  = load(&config_data, b"token_hash")?;
 
     // get that tier/round state
     let tier_rounds_key: String = "tier".to_owned()  + &tier.to_string();
@@ -567,18 +556,18 @@ pub fn try_trigger_lucky_number<S: Storage, A: Api, Q: Querier>(
 ) -> StdResult<HandleResponse> {
     let config_data = ReadonlyPrefixedStorage::new(CONFIG_DATA, &deps.storage);
 
-    let triggerer_address: HumanAddr = load(&config_data, b"triggerer").unwrap();
+    let triggerer_address: HumanAddr = load(&config_data, b"triggerer")?;
     if triggerer_address != env.message.sender {
         return Err(StdError::generic_err(format!(
             "Not the valid triggerer!"
         )));
     }
-    let token_address: HumanAddr = load(&config_data, b"token_address").unwrap();
-    let token_hash: String  = load(&config_data, b"token_hash").unwrap();
+    let token_address: HumanAddr = load(&config_data, b"token_address")?;
+    let token_hash: String  = load(&config_data, b"token_hash")?;
 
     // Generate seed vector: original entropy + this request entropy + max 6 entropy stored from users
-    let base_entropy = load(&config_data, b"base_entropy").unwrap();
-    let mut addition_entropy: Vec<_> = load(&config_data, b"addition_entropy").unwrap();
+    let base_entropy = load(&config_data, b"base_entropy")?;
+    let mut addition_entropy: Vec<_> = load(&config_data, b"addition_entropy")?;
 
     addition_entropy.push(base_entropy);
     addition_entropy.push(entropy.clone().to_be_bytes());
@@ -595,10 +584,10 @@ pub fn try_trigger_lucky_number<S: Storage, A: Api, Q: Querier>(
 
     if tier1 == true {
         let tier1_config = ReadonlyPrefixedStorage::new(LUCKY_NUMBER_CONFIG_TIER_1, &deps.storage);
-        let min_entries_tier1: i16 = load(&tier1_config, b"min_entries").unwrap();
-        let entry_fee_tier1: Uint128 = load(&tier1_config, b"entry_fee").unwrap();
-        let max_rand_number_tier1: i16 = load(&tier1_config, b"max_rand_number").unwrap();
-        let triggerer_fee_tier1: Uint128 = load(&tier1_config, b"triggerer_fee").unwrap();
+        let min_entries_tier1: i16 = load(&tier1_config, b"min_entries")?;
+        let entry_fee_tier1: Uint128 = load(&tier1_config, b"entry_fee")?;
+        let max_rand_number_tier1: i16 = load(&tier1_config, b"max_rand_number")?;
+        let triggerer_fee_tier1: Uint128 = load(&tier1_config, b"triggerer_fee")?;
 
         let mut tier1_rounds = PrefixedStorage::multilevel(&[ROUNDS_STATE, &"tier1".to_string().as_bytes()], &mut deps.storage);
         let mut tier1_rounds_store: AppendStoreMut<RoundStruct, _> = AppendStoreMut::attach_or_create(&mut tier1_rounds)?;
@@ -653,10 +642,10 @@ pub fn try_trigger_lucky_number<S: Storage, A: Api, Q: Querier>(
 
     if tier2 == true {
         let tier2_config = ReadonlyPrefixedStorage::new(LUCKY_NUMBER_CONFIG_TIER_2, &deps.storage);
-        let min_entries_tier2: i16 = load(&tier2_config, b"min_entries").unwrap();
-        let entry_fee_tier2: Uint128 = load(&tier2_config, b"entry_fee").unwrap();
-        let max_rand_number_tier2: i16 = load(&tier2_config, b"max_rand_number").unwrap();
-        let triggerer_fee_tier2: Uint128 = load(&tier2_config, b"triggerer_fee").unwrap();
+        let min_entries_tier2: i16 = load(&tier2_config, b"min_entries")?;
+        let entry_fee_tier2: Uint128 = load(&tier2_config, b"entry_fee")?;
+        let max_rand_number_tier2: i16 = load(&tier2_config, b"max_rand_number")?;
+        let triggerer_fee_tier2: Uint128 = load(&tier2_config, b"triggerer_fee")?;
 
         let mut tier2_rounds = PrefixedStorage::multilevel(&[ROUNDS_STATE, &"tier2".to_string().as_bytes()], &mut deps.storage);
         let mut tier2_rounds_store: AppendStoreMut<RoundStruct, _> = AppendStoreMut::attach_or_create(&mut tier2_rounds)?;
@@ -711,10 +700,10 @@ pub fn try_trigger_lucky_number<S: Storage, A: Api, Q: Querier>(
 
     if tier3 == true {
         let tier3_config = ReadonlyPrefixedStorage::new(LUCKY_NUMBER_CONFIG_TIER_3, &deps.storage);
-        let min_entries_tier3: i16 = load(&tier3_config, b"min_entries").unwrap();
-        let entry_fee_tier3: Uint128 = load(&tier3_config, b"entry_fee").unwrap();
-        let max_rand_number_tier3: i16 = load(&tier3_config, b"max_rand_number").unwrap();
-        let triggerer_fee_tier3: Uint128 = load(&tier3_config, b"triggerer_fee").unwrap();
+        let min_entries_tier3: i16 = load(&tier3_config, b"min_entries")?;
+        let entry_fee_tier3: Uint128 = load(&tier3_config, b"entry_fee")?;
+        let max_rand_number_tier3: i16 = load(&tier3_config, b"max_rand_number")?;
+        let triggerer_fee_tier3: Uint128 = load(&tier3_config, b"triggerer_fee")?;
 
         let mut tier3_rounds = PrefixedStorage::multilevel(&[ROUNDS_STATE, &"tier3".to_string().as_bytes()], &mut deps.storage);
         let mut tier3_rounds_store: AppendStoreMut<RoundStruct, _> = AppendStoreMut::attach_or_create(&mut tier3_rounds)?;
@@ -800,7 +789,7 @@ pub fn query<S: Storage, A: Api, Q: Querier>(
 
 fn query_triggerer<S: Storage, A: Api, Q: Querier>(deps: &Extern<S, A, Q>) -> QueryResult  {
     let config_data = ReadonlyPrefixedStorage::new(CONFIG_DATA, &deps.storage);
-    let triggerer_address: HumanAddr = load(&config_data, b"triggerer").unwrap();
+    let triggerer_address: HumanAddr = load(&config_data, b"triggerer")?;
 
     to_binary(&QueryAnswer::GetTriggerer {
         triggerer: triggerer_address
@@ -1106,10 +1095,10 @@ fn query_tier_configs<S: Storage, A: Api, Q: Querier>(
 
     if tier1 {
         let tier_config = ReadonlyPrefixedStorage::new(LUCKY_NUMBER_CONFIG_TIER_1, &deps.storage);
-        let entry_fee: Uint128 = load(&tier_config, b"entry_fee").unwrap();
-        let triggerer_fee: Uint128 = load(&tier_config, b"triggerer_fee").unwrap();
-        let min_entries: i16 = load(&tier_config, b"min_entries").unwrap();
-        let max_rand_number: i16 = load(&tier_config, b"max_rand_number").unwrap();
+        let entry_fee: Uint128 = load(&tier_config, b"entry_fee")?;
+        let triggerer_fee: Uint128 = load(&tier_config, b"triggerer_fee")?;
+        let min_entries: i16 = load(&tier_config, b"min_entries")?;
+        let max_rand_number: i16 = load(&tier_config, b"max_rand_number")?;
 
         tier1_configs = Some(TierConfig {
             entry_fee,
@@ -1121,10 +1110,10 @@ fn query_tier_configs<S: Storage, A: Api, Q: Querier>(
 
     if tier2 {
         let tier_config = ReadonlyPrefixedStorage::new(LUCKY_NUMBER_CONFIG_TIER_2, &deps.storage);
-        let entry_fee: Uint128 = load(&tier_config, b"entry_fee").unwrap();
-        let triggerer_fee: Uint128 = load(&tier_config, b"triggerer_fee").unwrap();
-        let min_entries: i16 = load(&tier_config, b"min_entries").unwrap();
-        let max_rand_number: i16 = load(&tier_config, b"max_rand_number").unwrap();
+        let entry_fee: Uint128 = load(&tier_config, b"entry_fee")?;
+        let triggerer_fee: Uint128 = load(&tier_config, b"triggerer_fee")?;
+        let min_entries: i16 = load(&tier_config, b"min_entries")?;
+        let max_rand_number: i16 = load(&tier_config, b"max_rand_number")?;
 
         tier2_configs = Some(TierConfig {
             entry_fee,
@@ -1136,10 +1125,10 @@ fn query_tier_configs<S: Storage, A: Api, Q: Querier>(
 
     if tier3 {
         let tier_config = ReadonlyPrefixedStorage::new(LUCKY_NUMBER_CONFIG_TIER_3, &deps.storage);
-        let entry_fee: Uint128 = load(&tier_config, b"entry_fee").unwrap();
-        let triggerer_fee: Uint128 = load(&tier_config, b"triggerer_fee").unwrap();
-        let min_entries: i16 = load(&tier_config, b"min_entries").unwrap();
-        let max_rand_number: i16 = load(&tier_config, b"max_rand_number").unwrap();
+        let entry_fee: Uint128 = load(&tier_config, b"entry_fee")?;
+        let triggerer_fee: Uint128 = load(&tier_config, b"triggerer_fee")?;
+        let min_entries: i16 = load(&tier_config, b"min_entries")?;
+        let max_rand_number: i16 = load(&tier_config, b"max_rand_number")?;
 
         tier3_configs = Some(TierConfig {
             entry_fee,
@@ -1164,7 +1153,7 @@ fn query_check_triggers<S: Storage, A: Api, Q: Querier>(
     let mut tier3_trigger: bool = false;
 
     let tier1_config = ReadonlyPrefixedStorage::new(LUCKY_NUMBER_CONFIG_TIER_1, &deps.storage);
-    let min_entries_tier1: i16 = load(&tier1_config, b"min_entries").unwrap();
+    let min_entries_tier1: i16 = load(&tier1_config, b"min_entries")?;
     let tier1_rounds = ReadonlyPrefixedStorage::multilevel(&[ROUNDS_STATE, &"tier1".to_string().as_bytes()], &deps.storage);
     let tier1_rounds_store = if let Some(result) = AppendStore::<RoundStruct, _>::attach(&tier1_rounds) {
         result?
@@ -1183,7 +1172,7 @@ fn query_check_triggers<S: Storage, A: Api, Q: Querier>(
     }
 
     let tier2_config = ReadonlyPrefixedStorage::new(LUCKY_NUMBER_CONFIG_TIER_2, &deps.storage);
-    let min_entries_tier2: i16 = load(&tier2_config, b"min_entries").unwrap();
+    let min_entries_tier2: i16 = load(&tier2_config, b"min_entries")?;
     let tier2_rounds = ReadonlyPrefixedStorage::multilevel(&[ROUNDS_STATE, &"tier2".to_string().as_bytes()], &deps.storage);
     let tier2_rounds_store = if let Some(result) = AppendStore::<RoundStruct, _>::attach(&tier2_rounds) {
         result?
@@ -1202,7 +1191,7 @@ fn query_check_triggers<S: Storage, A: Api, Q: Querier>(
     }
 
     let tier3_config = ReadonlyPrefixedStorage::new(LUCKY_NUMBER_CONFIG_TIER_3, &deps.storage);
-    let min_entries_tier3: i16 = load(&tier3_config, b"min_entries").unwrap();
+    let min_entries_tier3: i16 = load(&tier3_config, b"min_entries")?;
     let tier3_rounds = ReadonlyPrefixedStorage::multilevel(&[ROUNDS_STATE, &"tier3".to_string().as_bytes()], &deps.storage);
     let tier3_rounds_store = if let Some(result) = AppendStore::<RoundStruct, _>::attach(&tier3_rounds) {
         result?

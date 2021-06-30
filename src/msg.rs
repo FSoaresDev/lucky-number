@@ -28,7 +28,7 @@ pub struct InitMsg {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum HandleMsg {
-    Receive { sender: HumanAddr, from: HumanAddr, amount: Uint128, msg: Option<Binary> },
+    Receive { sender: HumanAddr, from: HumanAddr, amount: Uint128, msg: Binary },
     Bet {tier: i8, number: i16},
     CreateViewingKey {
         entropy: String,
